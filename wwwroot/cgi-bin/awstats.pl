@@ -9164,7 +9164,30 @@ sub DefinePerlParsingFormat {
 				push @fieldlib, 'code';
 				$PerlParsingFormat .= "\\\"([^\\\"]*)\\\"";    # code might be ""
 			}
-
+			elsif ( $f =~ /%codesquid$/ ) {
+				# VITKI: %codesquid
+				# Return code status
+				# combined with squid cache status in format: TCP_MISS/200
+				$pos_code = $i;
+				$i++;
+				push @fieldlib, 'code';
+				$PerlParsingFormat .= "[A-Z_]+\\\/(\\d+)";    # code might be ""
+			}
+			elsif ( $f =~ /%timesquid$/ ) {    # ddddddddddddd.mmm
+				# VITKI: %timesquid
+				# Date and time with unix timestamp format with milliseconds
+				# as in native squid logs: dddddddddd.mmm
+				$pos_date = $i;
+				$i++;
+				push @fieldlib, 'date';
+				$PerlParsingFormat .= "(\\d+)\\.\\d\\d\\d";
+			}
+			elsif ( $f =~ /%otherblanks$/ ) {
+				# VITKI: %otherblanks
+				# Means another not used field which can be prepended
+				# by spaces like field 2 in native squid logs
+				$PerlParsingFormat .= "\\s+[^$LogSeparatorWithoutStar]+";
+			}
 			elsif ( $f =~ /%bytesd$/ ) {
 				$pos_size = $i;
 				$i++;
