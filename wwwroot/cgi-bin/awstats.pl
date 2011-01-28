@@ -9156,6 +9156,15 @@ sub DefinePerlParsingFormat {
 				push @fieldlib, 'code';
 				$PerlParsingFormat .= "([^$LogSeparatorWithoutStar]+)";
 			}
+			elsif ( $f =~ /%codequot$/ ) {
+				# VITKI: %codequot
+				# Return code status in quotes as in nginx log files
+				$pos_code = $i;
+				$i++;
+				push @fieldlib, 'code';
+				$PerlParsingFormat .= "\\\"([^\\\"]*)\\\"";    # code might be ""
+			}
+
 			elsif ( $f =~ /%bytesd$/ ) {
 				$pos_size = $i;
 				$i++;
