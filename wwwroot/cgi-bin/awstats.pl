@@ -9187,7 +9187,7 @@ sub DefinePerlParsingFormat {
 				# VITKI: %otherblanks
 				# Means another not used field which can be prepended
 				# by spaces like field 2 in native squid logs
-				$PerlParsingFormat .= "\\s+[^$LogSeparatorWithoutStar]+";
+				$PerlParsingFormat .= "\\s*[^$LogSeparatorWithoutStar]+";
 			}
 			elsif ( $f =~ /%bytesd$/ ) {
 				$pos_size = $i;
