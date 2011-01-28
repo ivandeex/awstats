@@ -1739,6 +1739,14 @@ sub Read_Config {
 	foreach (@PossibleConfigDir) {
 		my $searchdir = $_;
 		if ( $searchdir && $searchdir !~ /[\\\/]$/ ) { $searchdir .= "/"; }
+		# VITKI: search for config which name includes DatabaseBreak
+		if ( open( CONFIG, "$searchdir$PROG.$SiteConfig.$DatabaseBreak.conf" ) ) {
+			$FileConfig = "$searchdir$PROG.$SiteConfig.$DatabaseBreak.conf";
+			$FileSuffix = ".$SiteConfig.$DatabaseBreak";
+			if ($Debug){debug("Opened config: $searchdir$PROG.$SiteConfig.$DatabaseBreak.conf", 2);}
+			last;
+		}else{if ($Debug){debug("Unable to open config file: $searchdir$PROG.$SiteConfig.conf", 2);}}
+		# /VITKI
 		if ( open( CONFIG, "$searchdir$PROG.$SiteConfig.conf" ) ) {
 			$FileConfig = "$searchdir$PROG.$SiteConfig.conf";
 			$FileSuffix = ".$SiteConfig";
