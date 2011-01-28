@@ -339,6 +339,13 @@ use vars qw/
 	'', '', '', '', '', '', '', '', '', '', '', '',
 	'', '', '', '', '', '', '', '', '', ''
   );
+# VITKI: easy switch between months and days
+use vars qw/
+  $LinkToDays $LinkToMonths
+  /;
+(
+	$LinkToDays,	$LinkToMonths
+ ) = ( 1, 1 );
 
 # ---------- Init arrays --------
 use vars qw/
@@ -12854,6 +12861,11 @@ sub HTMLMainMonthly{
 	print "<tr><td align=\"center\">\n";
 	print "<center>\n";
 
+	my $NewLinkTarget = $FrameName eq 'mainright' ? " target=\"_parent\"" : "";
+	my $NewLinkParams = $QueryString;
+	$NewLinkParams = CleanNewLinkParamsFrom( $NewLinkParams,
+						( 'framename', 'month', 'year', 'day', 'databasebreak' ) );
+
 	my $average_nb = my $average_u = my $average_v = my $average_p = 0;
 	my $average_h = my $average_k = 0;
 	my $total_u = my $total_v = my $total_p = my $total_h = my $total_k = 0;
@@ -13046,8 +13058,13 @@ sub HTMLMainMonthly{
 #				print "<td><a href=\"".XMLEncode("$AWScript${NewLinkParams}month=$monthix&year=$YearRequired")."\">$MonthNumLib{$monthix}<br />$YearRequired</a></td>";
 #			}
 #			else {
-			print "<td>"
-			  . (
+			print "<td>";
+			if ($LinkToMonths) {
+				print "<a href=\"".(
+					XMLEncode("${AWScript}${NewLinkParams}&month=${monthix}&year=${YearRequired}&databasebreak=month")
+					)."\"$NewLinkTarget>";
+			}
+			print (
 				!$StaticLinks
 				  && $monthix == $nowmonth
 				  && $YearRequired == $nowyear
@@ -13055,6 +13072,7 @@ sub HTMLMainMonthly{
 				: ''
 			  );
 			print "$MonthNumLib{$monthix}<br />$YearRequired";
+			if ($LinkToMonths) { print "</a>"; }
 			print(   !$StaticLinks
 				  && $monthix == $nowmonth
 				  && $YearRequired == $nowyear ? '</font>' : '' );
@@ -13109,8 +13127,13 @@ sub HTMLMainMonthly{
 		for ( my $ix = 1 ; $ix <= 12 ; $ix++ ) {
 			my $monthix = sprintf( "%02s", $ix );
 			print "<tr>";
-			print "<td>"
-			  . (
+			print "<td>";
+			if ($LinkToMonths) {
+				print "<a href=\"".(
+					XMLEncode("${AWScript}${NewLinkParams}&month=${monthix}&year=${YearRequired}&databasebreak=month")
+					)."\"$NewLinkTarget>";
+			}
+			print (
 				!$StaticLinks
 				  && $monthix == $nowmonth
 				  && $YearRequired == $nowyear
@@ -13121,6 +13144,7 @@ sub HTMLMainMonthly{
 			print(   !$StaticLinks
 				  && $monthix == $nowmonth
 				  && $YearRequired == $nowyear ? '</font>' : '' );
+			if ($LinkToMonths) { print "</a>"; }
 			print "</td>";
 			if ( $ShowMonthStats =~ /U/i ) {
 				print "<td>",
