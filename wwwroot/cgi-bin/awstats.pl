@@ -17798,6 +17798,7 @@ if ( $UpdateStats && $FrameName ne 'index' && $FrameName ne 'mainleft' )
 				|| $field[$pos_method] eq 'OK'             # Webstar
 				|| $field[$pos_method] eq 'ERR!'           # Webstar
 				|| $field[$pos_method] eq 'PRIV'           # Webstar
+				|| $field[$pos_method] eq 'CONNECT'        # Squid
 			)
 		  )
 		{
