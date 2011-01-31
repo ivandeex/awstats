@@ -343,16 +343,16 @@ use vars qw/
 use vars qw/
   $LinkToMonths $LinkToDays $LinkBackToMonth
   $AllowAnonymousUsers $AllowOnlyAnonymousUsers
-  $DisableMonthsInDaylyView
+  $MimicSARG $DisableMonthsInDaylyView
   /;
 (
 	$LinkToMonths,	$LinkToDays,	$LinkBackToMonth,
 	$AllowAnonymousUsers,	$AllowOnlyAnonymousUsers,
-	$DisableMonthsInDaylyView
+	$MimicSARG,		$DisableMonthsInDaylyView
  ) = (
- 	0, 0, 0,
- 	0, 0,
- 	0
+	0, 0, 0,
+	0, 0,
+	0, 0
  );
 
 # ---------- Init arrays --------
@@ -1823,9 +1823,20 @@ sub Read_Config {
 		$ValidSMTPCodes{"1"} = $ValidSMTPCodes{"250"} = 1;
 	}
 
-    if ($DisableMonthsInDaylyView && $DatabaseBreak eq 'day') {
-        $ShowMonthStats = $ShowDaysOfMonthStats = $ShowDaysOfWeekStats = 0;
-    }
+	# Configuration adjustments to mimic SARG behaviour
+	if ($MimicSARG) {
+		$ShowRobotsStats = $ShowWormsStats = 0;
+		$ShowFileTypesStats = $ShowDownloadsStats = 0;
+		$ShowOSStats = $ShowBrowsersStats = 0;
+		$ShowScreenSizeStats = $ShowOriginStats = 0;
+		$ShowKeyphrasesStats = $ShowKeywordsStats = 0;
+		$ShowMiscStats = $ShowDomainsStats = 0;
+	}
+
+	# DisableMonthsInDaylyView allows to keep month/day configs in the same file
+	if ($DisableMonthsInDaylyView && $DatabaseBreak eq 'day') {
+		$ShowMonthStats = $ShowDaysOfMonthStats = $ShowDaysOfWeekStats = 0;
+	}
 }
 
 #------------------------------------------------------------------------------
@@ -12840,7 +12851,7 @@ sub HTMLMainSummary{
 	print "</tr>\n";
 
 	# Show main indicators values for not viewed traffic values
-	if ( $LogType eq 'M' || $LogType eq 'W' || $LogType eq 'S' ) {
+	if ( !$MimicSARG && ( $LogType eq 'M' || $LogType eq 'W' || $LogType eq 'S' )) {
 		print "<tr>";
 		if ( $LogType eq 'M' ) {
 			print "<td class=\"aws\">$Message[166]</td>";
@@ -18355,6 +18366,8 @@ if ( $UpdateStats && $FrameName ne 'index' && $FrameName ne 'mainleft' )
 		($MimeHashLib{$extension}[1]) && $MimeHashLib{$extension}[1] ne 'p') { $PageBool = 0;}
 		if ( @NotPageFiles && &NotPageFile( $field[$pos_url] ) ) { $PageBool = 0; }
 
+		$PageBool = 1 if $MimicSARG;
+
 		# Analyze: misc tracker (must be before return code)
 		#---------------------------------------------------
 		if ( $urlwithnoquery =~ /$regmisc/o ) {
@@ -18421,7 +18434,7 @@ if ( $UpdateStats && $FrameName ne 'index' && $FrameName ne 'mainleft' )
 
 		# Analyze: successful favicon (=> countedtraffic=1 if favicon)
 		#--------------------------------------------------
-		if ( $urlwithnoquery =~ /$regfavico/o ) {
+		if ( !$MimicSARG && ( $urlwithnoquery =~ /$regfavico/o ) ) {
 			if ( $field[$pos_code] != 404 ) {
 				$_misc_h{'AddToFavourites'}++;
 			}
@@ -18435,7 +18448,7 @@ if ( $UpdateStats && $FrameName ne 'index' && $FrameName ne 'mainleft' )
 
 		# Analyze: Worms (=> countedtraffic=2 if worm)
 		#---------------------------------------------
-		if ( !$countedtraffic ) {
+		if ( !$MimicSARG && !$countedtraffic ) {
 			if ($LevelForWormsDetection) {
 				foreach (@WormsSearchIDOrder) {
 					if ( $field[$pos_url] =~ /$_/ ) {
@@ -18464,7 +18477,7 @@ if ( $UpdateStats && $FrameName ne 'index' && $FrameName ne 'mainleft' )
 
 		# Analyze: Status code (=> countedtraffic=3 if error)
 		#----------------------------------------------------
-		if ( !$countedtraffic ) {
+		if ( !$MimicSARG && !$countedtraffic ) {
 			if ( $LogType eq 'W' || $LogType eq 'S' )
 			{    # HTTP record or Stream record
 				if ( $ValidHTTPCodes{ $field[$pos_code] } ) {    # Code is valid
@@ -18554,7 +18567,7 @@ if ( $UpdateStats && $FrameName ne 'index' && $FrameName ne 'mainleft' )
 
 		# Analyze: Robot from robot database (=> countedtraffic=4 if robot)
 		#------------------------------------------------------------------
-		if ( !$countedtraffic ) {
+		if ( !$MimicSARG && !$countedtraffic ) {
 			if ( $pos_agent >= 0 ) {
 				if ($DecodeUA) {
 					$field[$pos_agent] =~ s/%20/_/g;
@@ -18641,7 +18654,7 @@ if ( $UpdateStats && $FrameName ne 'index' && $FrameName ne 'mainleft' )
 
    # Analyze: Robot from "hit on robots.txt" file (=> countedtraffic=5 if robot)
    # -------------------------------------------------------------------------
-		if ( !$countedtraffic ) {
+		if ( !$MimicSARG && !$countedtraffic ) {
 			if ( $urlwithnoquery =~ /$regrobot/o ) {
 				if ($Debug) { debug( "  It's an unknown robot", 2 ); }
 				$_robot_h{'unknown'}++;
@@ -18658,7 +18671,7 @@ if ( $UpdateStats && $FrameName ne 'index' && $FrameName ne 'mainleft' )
 		# Analyze: File type - Compression
 		#---------------------------------
 		if ( !$countedtraffic || $countedtraffic == 6) {
-			if ($LevelForFileTypesDetection) {
+			if (!$MimicSARG && $LevelForFileTypesDetection) {
 				if ($countedtraffic != 6){$_filetypes_h{$extension}++;}
 				if ( $field[$pos_size] ne '-' && $pos_size>0) {
 					$_filetypes_k{$extension} += int( $field[$pos_size] );
@@ -18697,7 +18710,7 @@ if ( $UpdateStats && $FrameName ne 'index' && $FrameName ne 'mainleft' )
 
 			# Analyze: Date - Hour - Pages - Hits - Kilo
 			#-------------------------------------------
-			if ($PageBool) {
+			if ($MimicSARG || $PageBool) {
 
 # Replace default page name with / only ('if' is to increase speed when only 1 value in @DefaultFile)
 				if ( @DefaultFile > 1 ) {
