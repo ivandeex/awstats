@@ -341,11 +341,11 @@ use vars qw/
   );
 # VITKI: easy switch between months and days
 use vars qw/
-  $LinkToDays $LinkToMonths
+  $LinkToMonths $LinkToDays $LinkBackToMonth
   /;
 (
-	$LinkToDays,	$LinkToMonths
- ) = ( 0, 0 );
+	$LinkToMonths,	$LinkToDays,	$LinkBackToMonth
+ ) = ( 0, 0, 0 );
 
 # ---------- Init arrays --------
 use vars qw/
@@ -10048,6 +10048,31 @@ sub HTMLMenu{
 			my %menu     = ();
 			my %menulink = ();
 			my %menutext = ();
+
+			# Back to month
+			if ($DatabaseBreak eq 'day' && $LinkBackToMonth) {
+				my $BackLinkTarget = $FrameName eq 'mainleft' ? " target=\"_parent\"" : ""
+				;
+				my $BackLinkParams = CleanNewLinkParamsFrom( $NewLinkParams, (
+					'framename', 'day', 'databasebreak', 'update', 'staticlinks'
+					) );
+				$BackLinkParams .= "&" if $BackLinkParams;
+				$BackLinkParams .= "databasebreak=month&";
+
+				HTMLShowMenuCateg(
+					'back',			# category
+					$Message[5],	# category text
+					'',				# category icon
+					$frame,			# frame
+					$BackLinkTarget,	# targetpage
+					$linkanchor,	# linkanchor
+					$BackLinkParams,	# new link params
+					$BackLinkTarget,	# new link target
+					{ 'main' => 1 }, # menu
+					{ 'main' => 2 }, # menulink
+					{ 'main' => $Message[76] }	# menutext
+				);
+			}
 
 			# When
 			%menu = (
