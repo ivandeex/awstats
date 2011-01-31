@@ -342,10 +342,15 @@ use vars qw/
 # VITKI: easy switch between months and days
 use vars qw/
   $LinkToMonths $LinkToDays $LinkBackToMonth
+  $AllowAnonymousUsers $AllowOnlyAnonymousUsers
   /;
 (
-	$LinkToMonths,	$LinkToDays,	$LinkBackToMonth
- ) = ( 0, 0, 0 );
+	$LinkToMonths,	$LinkToDays,	$LinkBackToMonth,
+	$AllowAnonymousUsers,	$AllowOnlyAnonymousUsers
+ ) = (
+ 	0, 0, 0,
+ 	0, 0
+ );
 
 # ---------- Init arrays --------
 use vars qw/
@@ -18154,6 +18159,10 @@ if ( $UpdateStats && $FrameName ne 'index' && $FrameName ne 'mainleft' )
 			  . ( $pos_hostr ? " and $field[$pos_hostr]" : "" )
 			  . " not qualified by OnlyHosts)";
 		}
+		elsif ( $AllowOnlyAnonymousUsers && $field[$pos_logname] && $field[$pos_logname] ne '-' ) {
+			$qualifdrop =
+"Dropped record (URL $field[$pos_logname] is not anonymous)";
+		}
 		elsif ( @OnlyUsers && !&OnlyUser( $field[$pos_logname] ) ) {
 			$qualifdrop =
 "Dropped record (URL $field[$pos_logname] not qualified by OnlyUsers)";
@@ -18714,7 +18723,9 @@ if ( $UpdateStats && $FrameName ne 'index' && $FrameName ne 'mainleft' )
 			#---------------
 			if (   $pos_logname >= 0
 				&& $field[$pos_logname]
-				&& $field[$pos_logname] ne '-' )
+				&& ($field[$pos_logname] ne '-'
+					|| $AllowAnonymousUsers || $AllowOnlyAnonymousUsers)
+				)
 			{
 				$field[$pos_logname] =~
 				  s/ /_/g;    # This is to allow space in logname
