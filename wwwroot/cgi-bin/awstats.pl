@@ -345,7 +345,7 @@ use vars qw/
   /;
 (
 	$LinkToDays,	$LinkToMonths
- ) = ( 1, 1 );
+ ) = ( 0, 0 );
 
 # ---------- Init arrays --------
 use vars qw/
@@ -12861,10 +12861,12 @@ sub HTMLMainMonthly{
 	print "<tr><td align=\"center\">\n";
 	print "<center>\n";
 
+	# LinkParams for LinkToMonths
 	my $NewLinkTarget = $FrameName eq 'mainright' ? " target=\"_parent\"" : "";
-	my $NewLinkParams = $QueryString;
-	$NewLinkParams = CleanNewLinkParamsFrom( $NewLinkParams,
-						( 'framename', 'month', 'year', 'day', 'databasebreak' ) );
+	my $MonthLinkParams = CleanNewLinkParamsFrom( $QueryString, (
+			'framename', 'month', 'year', 'day', 'databasebreak', 'update', 'staticlinks'
+			) );
+	$MonthLinkParams .= "&" if $MonthLinkParams;
 
 	my $average_nb = my $average_u = my $average_v = my $average_p = 0;
 	my $average_h = my $average_k = 0;
@@ -13061,7 +13063,7 @@ sub HTMLMainMonthly{
 			print "<td>";
 			if ($LinkToMonths) {
 				print "<a href=\"".(
-					XMLEncode("${AWScript}${NewLinkParams}&month=${monthix}&year=${YearRequired}&databasebreak=month")
+					XMLEncode("${AWScript}${MonthLinkParams}month=${monthix}&year=${YearRequired}&databasebreak=month")
 					)."\"$NewLinkTarget>";
 			}
 			print (
@@ -13072,7 +13074,9 @@ sub HTMLMainMonthly{
 				: ''
 			  );
 			print "$MonthNumLib{$monthix}<br />$YearRequired";
-			if ($LinkToMonths) { print "</a>"; }
+			if ($LinkToMonths) {
+				print "</a>";
+			}
 			print(   !$StaticLinks
 				  && $monthix == $nowmonth
 				  && $YearRequired == $nowyear ? '</font>' : '' );
@@ -13130,7 +13134,7 @@ sub HTMLMainMonthly{
 			print "<td>";
 			if ($LinkToMonths) {
 				print "<a href=\"".(
-					XMLEncode("${AWScript}${NewLinkParams}&month=${monthix}&year=${YearRequired}&databasebreak=month")
+					XMLEncode("${AWScript}${MonthLinkParams}month=${monthix}&year=${YearRequired}&databasebreak=month")
 					)."\"$NewLinkTarget>";
 			}
 			print (
@@ -13144,7 +13148,9 @@ sub HTMLMainMonthly{
 			print(   !$StaticLinks
 				  && $monthix == $nowmonth
 				  && $YearRequired == $nowyear ? '</font>' : '' );
-			if ($LinkToMonths) { print "</a>"; }
+			if ($LinkToMonths) {
+				print "</a>";
+			}
 			print "</td>";
 			if ( $ShowMonthStats =~ /U/i ) {
 				print "<td>",
