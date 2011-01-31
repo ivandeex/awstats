@@ -13257,6 +13257,12 @@ sub HTMLMainDaily{
 		$NewLinkTarget = " target=\"_parent\"";
 	}
 
+	# LinkParams for LinkToDays and all
+	my $DayLinkParams = CleanNewLinkParamsFrom( $QueryString, (
+			'framename', 'month', 'year', 'day', 'databasebreak', 'update', 'staticlinks'
+			) );
+	$DayLinkParams .= "&" if $DayLinkParams;
+
 	my $average_v = my $average_p = 0;
 	my $average_h = my $average_k = 0;
 	my $total_u = my $total_v = my $total_p = my $total_h = my $total_k = 0;
@@ -13492,6 +13498,11 @@ sub HTMLMainDaily{
 				: ""
 			  )
 			  . ">";
+			if ($LinkToDays) {
+				print "<a href=\"".(
+					XMLEncode("${AWScript}${DayLinkParams}day=${day}&month=${month}&year=${year}&databasebreak=day")
+					)."\"$NewLinkTarget>";
+			}
 			print(
 				!$StaticLinks
 				  && $day == $nowday
@@ -13510,6 +13521,9 @@ sub HTMLMainDaily{
 				  && $day == $nowday
 				  && $month == $nowmonth
 				  && $year == $nowyear ? '</font>' : '' );
+			if ($LinkToDays) {
+				print "</a>";
+			}
 			print "</td>\n";
 		}
 		print "<td>&nbsp;</td>";
@@ -13565,8 +13579,13 @@ sub HTMLMainDaily{
 				: ""
 			  )
 			  . ">";
-			print "<td>"
-			  . (
+			print "<td>";
+			if ($LinkToDays) {
+				print "<a href=\"".(
+					XMLEncode("${AWScript}${DayLinkParams}day=${day}&month=${month}&year=${year}&databasebreak=day")
+					)."\"$NewLinkTarget>";
+			}
+			print (
 				!$StaticLinks
 				  && $day == $nowday
 				  && $month == $nowmonth
@@ -13579,6 +13598,9 @@ sub HTMLMainDaily{
 				  && $day == $nowday
 				  && $month == $nowmonth
 				  && $year == $nowyear ? '</font>' : '' );
+			if ($LinkToDays) {
+				print "</a>";
+			}
 			print "</td>";
 			if ( $ShowDaysOfMonthStats =~ /V/i ) {
 				print "<td>",
