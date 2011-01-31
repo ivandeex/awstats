@@ -343,13 +343,16 @@ use vars qw/
 use vars qw/
   $LinkToMonths $LinkToDays $LinkBackToMonth
   $AllowAnonymousUsers $AllowOnlyAnonymousUsers
+  $DisableMonthsInDaylyView
   /;
 (
 	$LinkToMonths,	$LinkToDays,	$LinkBackToMonth,
-	$AllowAnonymousUsers,	$AllowOnlyAnonymousUsers
+	$AllowAnonymousUsers,	$AllowOnlyAnonymousUsers,
+	$DisableMonthsInDaylyView
  ) = (
  	0, 0, 0,
- 	0, 0
+ 	0, 0,
+ 	0
  );
 
 # ---------- Init arrays --------
@@ -1819,6 +1822,10 @@ sub Read_Config {
 	if ( !scalar keys %ValidSMTPCodes ) {
 		$ValidSMTPCodes{"1"} = $ValidSMTPCodes{"250"} = 1;
 	}
+
+    if ($DisableMonthsInDaylyView && $DatabaseBreak eq 'day') {
+        $ShowMonthStats = $ShowDaysOfMonthStats = $ShowDaysOfWeekStats = 0;
+    }
 }
 
 #------------------------------------------------------------------------------
