@@ -343,16 +343,19 @@ use vars qw/
 use vars qw/
   $LinkToMonths $LinkToDays $LinkBackToMonth
   $AllowAnonymousUsers $AllowOnlyAnonymousUsers
-  $MimicSARG $DisableMonthsInDaylyView
+  $MimicSARG $GroupPagesByHost
+  $DisableMonthsInDaylyView
   /;
 (
 	$LinkToMonths,	$LinkToDays,	$LinkBackToMonth,
 	$AllowAnonymousUsers,	$AllowOnlyAnonymousUsers,
-	$MimicSARG,		$DisableMonthsInDaylyView
+	$MimicSARG,		$GroupPagesByHost,
+	$DisableMonthsInDaylyView
  ) = (
 	0, 0, 0,
 	0, 0,
-	0, 0
+	0, 0,
+	0
  );
 
 # ---------- Init arrays --------
@@ -5174,9 +5177,21 @@ sub Read_History_With_TmpUpdate {
 				$field[0] = '';
 				my $count       = 0;
 				my $countloaded = 0;
+				my (%accounted, %accounted_loaded);
+
 				do {
 					if ( $field[0] ) {
-						$count++;
+						my $shortened = $field[0];
+						if ($GroupPagesByHost) {
+							if ( $shortened =~ m'([a-zA-Z]+://[^/\?]+)(?:\?|/|$)' ) {
+								$shortened = $1;
+							}
+						}
+						my $is_accounted = ($GroupPagesByHost
+											&& $accounted{$shortened});
+						$accounted{$shortened} ++;
+						$count++  unless $is_accounted;
+
 						if ( $SectionsToLoad{'sider'} ) {
 							my $loadrecord = 0;
 							if ($withupdate) {
@@ -5194,7 +5209,7 @@ sub Read_History_With_TmpUpdate {
 										{
 											$loadrecord = 1;
 										}
-										$TotalDifferentPages++;
+										$TotalDifferentPages++ unless $is_accounted;
 									}
 								}
 								else
@@ -5229,7 +5244,7 @@ sub Read_History_With_TmpUpdate {
 										{
 											$loadrecord = 1;
 										}
-										$TotalDifferentPages++;
+										$TotalDifferentPages++ unless $is_accounted;
 									}
 								}
 
@@ -5239,6 +5254,7 @@ sub Read_History_With_TmpUpdate {
 								$TotalExits      += ( $field[4] || 0 );
 							}
 							if ($loadrecord) {
+								$field[0] = $shortened;
 								if ( $field[1] ) {
 									$_url_p{ $field[0] } += $field[1];
 								}
@@ -5251,7 +5267,9 @@ sub Read_History_With_TmpUpdate {
 								if ( $field[4] ) {
 									$_url_x{ $field[0] } += $field[4];
 								}
-								$countloaded++;
+								$countloaded++ unless ($GroupPagesByHost
+												&& $accounted_loaded{$shortened});
+								$accounted_loaded{$shortened} ++;
 							}
 						}
 					}
@@ -5265,6 +5283,10 @@ sub Read_History_With_TmpUpdate {
 				  } until ( $field[0] eq 'END_SIDER'
 					  || $field[0] eq "${xmleb}END_SIDER"
 					  || !$_ );
+				if ($GroupPagesByHost) {
+					$_url_k{$_} *= $_url_p{$_}
+						for keys %_url_p;
+				}
 				if (   $field[0] ne 'END_SIDER'
 					&& $field[0] ne "${xmleb}END_SIDER" )
 				{
