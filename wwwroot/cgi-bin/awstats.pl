@@ -345,16 +345,19 @@ use vars qw/
   $AllowAnonymousUsers $AllowOnlyAnonymousUsers
   $MimicSARG $GroupPagesByServer
   $DisableMonthsInDaylyView
+  $ShowAverageSizeAsTotal
   /;
 (
 	$LinkToMonths,	$LinkToDays,	$LinkBackToMonth,
 	$AllowAnonymousUsers,	$AllowOnlyAnonymousUsers,
 	$MimicSARG,		$GroupPagesByServer,
-	$DisableMonthsInDaylyView
+	$DisableMonthsInDaylyView,
+	$ShowAverageSizeAsTotal
  ) = (
 	0, 0, 0,
 	0, 0,
 	0, 0,
+	0,
 	0
  );
 
@@ -5284,8 +5287,7 @@ sub Read_History_With_TmpUpdate {
 				  } until ( $field[0] eq 'END_SIDER'
 					  || $field[0] eq "${xmleb}END_SIDER"
 					  || !$_ );
-				if ($GroupPagesByServer && $MimicSARG) {
-					# FIXME: seems to me, it's a SARG bug...
+				if ($ShowAverageSizeAsTotal) {
 					$_url_k{$_} *= $_url_p{$_}
 						for keys %_url_p;
 				}
