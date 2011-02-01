@@ -5284,7 +5284,8 @@ sub Read_History_With_TmpUpdate {
 				  } until ( $field[0] eq 'END_SIDER'
 					  || $field[0] eq "${xmleb}END_SIDER"
 					  || !$_ );
-				if ($GroupPagesByHost) {
+				if ($GroupPagesByHost && $MimicSARG) {
+					# FIXME: seems to me, it's a SARG bug...
 					$_url_k{$_} *= $_url_p{$_}
 						for keys %_url_p;
 				}
