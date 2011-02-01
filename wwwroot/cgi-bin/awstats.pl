@@ -343,13 +343,13 @@ use vars qw/
 use vars qw/
   $LinkToMonths $LinkToDays $LinkBackToMonth
   $AllowAnonymousUsers $AllowOnlyAnonymousUsers
-  $MimicSARG $GroupPagesByHost
+  $MimicSARG $GroupPagesByServer
   $DisableMonthsInDaylyView
   /;
 (
 	$LinkToMonths,	$LinkToDays,	$LinkBackToMonth,
 	$AllowAnonymousUsers,	$AllowOnlyAnonymousUsers,
-	$MimicSARG,		$GroupPagesByHost,
+	$MimicSARG,		$GroupPagesByServer,
 	$DisableMonthsInDaylyView
  ) = (
 	0, 0, 0,
@@ -5183,12 +5183,12 @@ sub Read_History_With_TmpUpdate {
 				do {
 					if ( $field[0] ) {
 						my $shortened = $field[0];
-						if ($GroupPagesByHost) {
+						if ($GroupPagesByServer) {
 							if ( $shortened =~ m'([a-zA-Z]+://[^/\?]+)(?:\?|/|$)' ) {
 								$shortened = $1;
 							}
 						}
-						my $is_accounted = ($GroupPagesByHost
+						my $is_accounted = ($GroupPagesByServer
 											&& $accounted{$shortened});
 						$accounted{$shortened} ++;
 						$count++  unless $is_accounted;
@@ -5268,7 +5268,7 @@ sub Read_History_With_TmpUpdate {
 								if ( $field[4] ) {
 									$_url_x{ $field[0] } += $field[4];
 								}
-								$countloaded++ unless ($GroupPagesByHost
+								$countloaded++ unless ($GroupPagesByServer
 												&& $accounted_loaded{$shortened});
 								$accounted_loaded{$shortened} ++;
 							}
@@ -5284,7 +5284,7 @@ sub Read_History_With_TmpUpdate {
 				  } until ( $field[0] eq 'END_SIDER'
 					  || $field[0] eq "${xmleb}END_SIDER"
 					  || !$_ );
-				if ($GroupPagesByHost && $MimicSARG) {
+				if ($GroupPagesByServer && $MimicSARG) {
 					# FIXME: seems to me, it's a SARG bug...
 					$_url_k{$_} *= $_url_p{$_}
 						for keys %_url_p;
