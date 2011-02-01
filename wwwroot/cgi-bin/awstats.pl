@@ -1834,6 +1834,7 @@ sub Read_Config {
 		$ShowScreenSizeStats = $ShowOriginStats = 0;
 		$ShowKeyphrasesStats = $ShowKeywordsStats = 0;
 		$ShowMiscStats = $ShowDomainsStats = 0;
+		$ShowHTTPErrorsStats = 0;
 	}
 
 	# DisableMonthsInDaylyView allows to keep month/day configs in the same file
