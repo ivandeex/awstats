@@ -20214,7 +20214,9 @@ END_ERROR_TEXT
 	if ( $DNSLookup == 1 && $NbOfNewLines ) {
 
 		# Save new DNS last update cache file
-		Save_DNS_Cache_File( \%TmpDNSLookup, "$DirData/$DNSLastUpdateCacheFile",
+		my $FilePath = $DNSLastUpdateCacheFile;
+		$FilePath = "$DirData/$FilePath" if $FilePath !~ m'^/';
+		Save_DNS_Cache_File( \%TmpDNSLookup, $FilePath,
 			"$FileSuffix" );    # Save into file using FileSuffix
 	}
 
