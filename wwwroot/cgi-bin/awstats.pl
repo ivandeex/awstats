@@ -19952,7 +19952,7 @@ s/^(cache|related):[^\+]+//
 				scalar keys %{ '_section_' . $extranum . '_h' } >
 				$ExtraTrackedRowsLimit )
 			{
-				error(<<END_ERROR_TEXT);
+				my $message = <<END_ERROR_TEXT;
 The number of values found for extra section $extranum has grown too large.
 In order to prevent awstats from using an excessive amount of memory, the number
 of values is currently limited to $ExtraTrackedRowsLimit. Perhaps you should consider
@@ -19960,6 +19960,7 @@ revising extract parameters for extra section $extranum. If you are certain you
 want to track such a large data set, you can increase the limit by setting
 ExtraTrackedRowsLimit in your awstats configuration file.
 END_ERROR_TEXT
+				error($message);
 			}
 		}
 
