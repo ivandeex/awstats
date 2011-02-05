@@ -346,19 +346,22 @@ use vars qw/
   $MimicSARG $GroupPagesByServer
   $DisableMonthsInDaylyView
   $ShowAverageSizeAsTotal
+  $PerHostLink
   /;
 (
 	$LinkToMonths,	$LinkToDays,	$LinkBackToMonth,
 	$AllowAnonymousUsers,	$AllowOnlyAnonymousUsers,
 	$MimicSARG,		$GroupPagesByServer,
 	$DisableMonthsInDaylyView,
-	$ShowAverageSizeAsTotal
+	$ShowAverageSizeAsTotal,
+	$PerHostLink
  ) = (
 	0, 0, 0,
 	0, 0,
 	0, 0,
 	0,
-	0
+	0,
+	''
  );
 
 # ---------- Init arrays --------
@@ -12198,7 +12201,14 @@ sub HTMLShowHostsUnknown{
 		\%_host_p );
 	foreach my $key (@keylist) {
 		my $host = CleanXSS($key);
-		print "<tr><td class=\"aws\">$host</td>";
+		# If PerHostLink is set, link to the host details page
+		my $host_link = $host;
+		if ($PerHostLink) {
+			$host_link = $PerHostLink;
+			$host_link =~ s/\{host\}/$host/;
+			$host_link = "<a href=\"$host_link\">$host</a>";
+		}
+		print "<tr><td class=\"aws\">$host_link</td>";
 		&HTMLShowHostInfo($key);
 		if ( $ShowHostsStats =~ /P/i ) {
 			print "<td>"
@@ -12341,8 +12351,15 @@ sub HTMLShowHosts{
 	}
 	foreach my $key (@keylist) {
 		my $host = CleanXSS($key);
+		# If PerHostLink is set, link to the host details page
+		my $host_link = $host;
+		if ($PerHostLink) {
+			$host_link = $PerHostLink;
+			$host_link =~ s/\{host\}/$host/;
+			$host_link = "<a href=\"$host_link\">$host</a>";
+		}
 		print "<tr><td class=\"aws\">"
-		  . ( $_robot_l{$key} ? '<b>'  : '' ) . "$host"
+		  . ( $_robot_l{$key} ? '<b>'  : '' ) . "$host_link"
 		  . ( $_robot_l{$key} ? '</b>' : '' ) . "</td>";
 		&HTMLShowHostInfo($key);
 		if ( $ShowHostsStats =~ /P/i ) {
@@ -14706,7 +14723,14 @@ sub HTMLMainHosts{
 	
 	foreach my $key (@keylist) {
 		print "<tr>";
-		print "<td class=\"aws\">$key</td>";
+		# If PerHostLink is set, link to the host details page
+		my $host_link = $key;
+		if ($PerHostLink) {
+			$host_link = $PerHostLink;
+			$host_link =~ s/\{host\}/$key/;
+			$host_link = "<a href=\"$host_link\">$key</a>";
+		}
+		print "<td class=\"aws\">$host_link</td>";
 		&HTMLShowHostInfo($key);
 		if ( $ShowHostsStats =~ /P/i ) {
 			print '<td>' . ( Format_Number($_host_p{$key}) || "&nbsp;" ) . '</td>';
