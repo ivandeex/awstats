@@ -484,7 +484,9 @@ sub Chart_Map(){
 	# loop and dump
     my $i = 0;
     for ($i .. (scalar @$blocklabel - 1)) {
-    	print "\tdata.setValue($i, 0, \"".@$blocklabel[$i]."\");\n";
+    	my $country_name = @$blocklabel[$i];
+    	$country_name = "Russia" if $country_name eq "Russian Federation";
+    	print "\tdata.setValue($i, 0, \"".$country_name."\");\n";
     	print "\tdata.setValue($i, 1, ".@$valdata[$i].");\n";
     	$i++;
     	# Google's Geomap only supports up to 400 entries
