@@ -1738,7 +1738,7 @@ sub Read_Config {
 			"$DIR",
 			"/etc/awstats",
 			"/usr/local/etc/awstats", "/etc",
-			"/etc/vitki/awstats", # VITKI specific config location
+			"/var/vanko/awstats", # vanko specific config location
 			"/etc/opt/awstats"
 		); 
 
