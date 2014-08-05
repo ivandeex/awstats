@@ -6,7 +6,6 @@
 # alone for any other log analyzer.
 # See COPYING.TXT file about AWStats GNU General Public License.
 #-----------------------------------------------------------------------------
-# $Revision: 1.43 $ - $Author: manolamancha $ - $Date: 2010/04/30 12:26:56 $
 
 use strict; no strict "refs";
 #use diagnostics;
@@ -36,7 +35,7 @@ my %TmpDNSLookup = ();
 
 # ---------- Init variables --------
 use vars qw/ $REVISION $VERSION /;
-$REVISION='$Revision: 1.43 $'; $REVISION =~ /\s(.*)\s/; $REVISION=$1;
+$REVISION = '20140126';
 $VERSION="1.2 (build $REVISION)";
 
 use vars qw/ $NBOFLINESFORBENCHMARK /;
@@ -102,6 +101,26 @@ my $bzcat_file = '\.bz2$';
 #-----------------------------------------------------------------------------
 # Functions
 #-----------------------------------------------------------------------------
+
+#------------------------------------------------------------------------------
+# Function:		Add all files of a specific directory
+# Parameters:	$message
+# Input:		Directory path
+# Output:		None
+# Return:		Array with list of files
+#------------------------------------------------------------------------------
+sub addDirectory {
+    my ($dir,@list) = @_;
+    my $dirH;
+    opendir($dirH, $dir) || die ("Can't open '$dir'");
+    while ($_ = readdir($dirH) ) {
+		if (-f "$dir/$_") {
+		    push @list, "$dir/$_";
+		}
+    }
+    closedir($dirH);
+    return @list;
+}
 
 #------------------------------------------------------------------------------
 # Function:		Write an error message and exit
@@ -274,6 +293,9 @@ for (0..@ARGV-1) {
 		elsif ($ARGV[$_] =~ /ignoremissing/i) { $IgnoreMissing=1; }
 		else { print "Unknown argument $ARGV[$_] ignored\n"; }
 	}
+	elsif ($ARGV[$_] =~ /addfolder=(.*)$/i) {
+   		@ParamFile = addDirectory($1, @ParamFile);
+	}
 	else {
 		push @ParamFile, $ARGV[$_];
 		$cpt++;
@@ -316,6 +338,7 @@ if (scalar @ParamFile == 0) {
 	print "  $PROG.$Extension [options] file\n";
 	print "  $PROG.$Extension [options] file1 ... filen\n";
 	print "  $PROG.$Extension [options] *.*\n";
+	print "  $PROG.$Extension [options] addfolder=dirname\n";
 	print "  perl $PROG.$Extension [options] *.* > newfile\n";
 	print "Options:\n";
 	print "  -dnslookup      make a reverse DNS lookup on IP adresses\n";
@@ -369,7 +392,7 @@ if (scalar @ParamFile == 0) {
 	print "  Automatic detection of log format\n";
 	print "  Files can be .gz/.bz2 files if zcat/bzcat tools are available in PATH.\n";
 	print "  Multithreaded reverse DNS lookup (several parallel requests) with Perl 5.8+.\n";
-	print "New versions and FAQ at http://awstats.sourceforge.net\n";
+	print "New versions and FAQ at http://www.awstats.org\n";
 	exit 0;
 }
 

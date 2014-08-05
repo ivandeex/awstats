@@ -5,8 +5,19 @@
 # necessary from your scheduler to update your statistics and from command
 # line or a browser to read report results.
 # See AWStats documentation (in docs/ directory) for all setup instructions.
+#
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 2 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
 #------------------------------------------------------------------------------
-# $Revision: 1.971 $ - $Author: eldy $ - $Date: 2010/10/16 17:24:03 $
 require 5.007;
 
 #$|=1;
@@ -18,15 +29,15 @@ use Time::Local
   ; # use Time::Local 'timelocal_nocheck' is faster but not supported by all Time::Local modules
 use Socket;
 use Encode;
+use File::Spec;
+
 
 #------------------------------------------------------------------------------
 # Defines
 #------------------------------------------------------------------------------
 use vars qw/ $REVISION $VERSION /;
-$REVISION = '$Revision: 1.971 $';
-$REVISION =~ /\s(.*)\s/;
-$REVISION = $1;
-$VERSION  = "7.0 (build $REVISION)";
+$REVISION = '20140126';
+$VERSION  = "7.3 (build $REVISION)";
 
 # ----- Constants -----
 use vars qw/
@@ -298,6 +309,7 @@ use vars qw/
   $AllowAccessFromWebToFollowingIPAddresses $HTMLHeadSection $HTMLEndSection $LinksToWhoIs $LinksToIPWhoIs
   $LogFile $LogType $LogFormat $LogSeparator $Logo $LogoLink $StyleSheet $WrapperScript $SiteDomain
   $UseHTTPSLinkForUrl $URLQuerySeparators $URLWithAnchor $ErrorMessages $ShowFlagLinks
+  $AddLinkToExternalCGIWrapper
   /;
 (
 	$DirLock,                                  $DirCgi,
@@ -313,11 +325,11 @@ use vars qw/
 	$WrapperScript,                            $SiteDomain,
 	$UseHTTPSLinkForUrl,                       $URLQuerySeparators,
 	$URLWithAnchor,                            $ErrorMessages,
-	$ShowFlagLinks
+	$ShowFlagLinks,                            $AddLinkToExternalCGIWrapper
   )
   = (
 	'', '', '', '', '', '', '', '', '', '', '', '', '', '',
-	'', '', '', '', '', '', '', '', '', '', '', '', ''
+	'', '', '', '', '', '', '', '', '', '', '', '', '', '', ''
   );
 use vars qw/
   $color_Background $color_TableBG $color_TableBGRowTitle
@@ -511,12 +523,12 @@ use vars qw/
   %MonthUnique %MonthVisits
   %MonthPages %MonthHits %MonthBytes
   %MonthNotViewedPages %MonthNotViewedHits %MonthNotViewedBytes
-  %_session %_browser_h
+  %_session %_browser_h %_browser_p
   %_domener_p %_domener_h %_domener_k %_errors_h %_errors_k
   %_filetypes_h %_filetypes_k %_filetypes_gz_in %_filetypes_gz_out
   %_host_p %_host_h %_host_k %_host_l %_host_s %_host_u
   %_waithost_e %_waithost_l %_waithost_s %_waithost_u
-  %_keyphrases %_keywords %_os_h %_pagesrefs_p %_pagesrefs_h %_robot_h %_robot_k %_robot_l %_robot_r
+  %_keyphrases %_keywords %_os_h %_os_p %_pagesrefs_p %_pagesrefs_h %_robot_h %_robot_k %_robot_l %_robot_r
   %_worm_h %_worm_k %_worm_l %_login_h %_login_p %_login_k %_login_l %_screensize_h
   %_misc_p %_misc_h %_misc_k
   %_cluster_p %_cluster_h %_cluster_k
@@ -725,6 +737,7 @@ use vars qw/ @Message /;
 	'Konqueror versions',
 	',',
  	'Downloads',
+ 	'Export CSV'
 );
 
 #------------------------------------------------------------------------------
@@ -795,7 +808,7 @@ sub html_head {
 			else { print "<?xml version=\"1.0\" encoding=\"iso-8859-1\"?>\n"; }
 			if ( $FrameName ne 'index' ) {
 				print
-"<!DOCTYPE html PUBLIC \"-//W3C//DTD XHTML 1.0 Strict//EN\" \"http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd\">\n";
+"<!DOCTYPE html PUBLIC \"-//W3C//DTD XHTML 1.0 Transitional//EN\" \"http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd\">\n";
 			}
 			else {
 				print
@@ -807,11 +820,11 @@ sub html_head {
 		else {
 			if ( $FrameName ne 'index' ) {
 				print
-"<!DOCTYPE html PUBLIC \"-//W3C//DTD HTML 4.01 Transitional//EN\">\n";
+"<!DOCTYPE html PUBLIC \"-//W3C//DTD HTML 4.01 Transitional//EN\" \"http://www.w3.org/TR/html4/loose.dtd\">\n";
 			}
 			else {
 				print
-"<!DOCTYPE html PUBLIC \"-//W3C//DTD HTML 4.01 Frameset//EN\">\n";
+"<!DOCTYPE html PUBLIC \"-//W3C//DTD HTML 4.01 Frameset//EN\" \"http://www.w3.org/TR/html4/frameset.dtd\">\n";
 			}
 			print '<html lang="' . $Lang . '"'
 			  . ( $PageDir ? ' dir="rtl"' : '' ) . ">\n";
@@ -825,7 +838,7 @@ sub html_head {
 
 		# Affiche tag meta generator
 		print
-"<meta name=\"generator\" content=\"AWStats $VERSION from config file awstats.$SiteConfig.conf (http://awstats.sourceforge.net)\"$endtag\n";
+"<meta name=\"generator\" content=\"AWStats $VERSION from config file awstats.$SiteConfig.conf (http://www.awstats.org)\"$endtag\n";
 
 		# Affiche tag meta robots
 		if ($MetaRobot) {
@@ -885,14 +898,6 @@ sub html_head {
 
 # A STYLE section must be in head section. Do not use " for number in a style section
 			print "<style type=\"text/css\">\n";
-			if ( $BuildReportFormat eq 'xhtml' || $BuildReportFormat eq 'xml' )
-			{
-				print( $ENV{'HTTP_USER_AGENT'} =~ /Firebird/i
-					? "<!--\n"
-					: "<![CDATA[\n"
-				);
-			}
-			else { print "<!--\n"; }
 
 			if ( !$StyleSheet ) {
 				print
@@ -943,14 +948,6 @@ EOF
 				&$function();
 			}
 
-			if ( $BuildReportFormat eq 'xhtml' || $BuildReportFormat eq 'xml' )
-			{
-				print( $ENV{'HTTP_USER_AGENT'} =~ /Firebird/i
-					? "//-->\n"
-					: "]]>\n"
-				);
-			}
-			else { print "//-->\n"; }
 			print "</style>\n";
 		}
 
@@ -1002,7 +999,7 @@ sub html_end {
 			print
 "<span dir=\"ltr\" style=\"font: 11px verdana, arial, helvetica; color: #$color_text;\">";
 			print
-"<b>Advanced Web Statistics $VERSION</b> - <a href=\"http://awstats.sourceforge.net\" target=\"awstatshome\">";
+"<b>Advanced Web Statistics $VERSION</b> - <a href=\"http://www.awstats.org\" target=\"awstatshome\">";
 			print $Message[169] . " $PROG";
 			if ($listplugins) {
 				my $atleastoneplugin = 0;
@@ -1190,12 +1187,12 @@ sub error {
 			if ( $LogFormat == 4 ) {
 				print
 "${tagbold}\"common log format\"${tagunbold} like this:${tagbr}\n";
-				print( scalar keys %HTMLOutput ? "$tagfontgrey<i>" : "" );
+				print( scalar keys %HTMLOutput ? "$tagfontgrey<i><pre>" : "" );
 				print
 "111.22.33.44 - - [10/Jan/2001:02:14:14 +0200] \"GET / HTTP/1.1\" 200 1234\n";
 				print(
 					scalar keys %HTMLOutput
-					? "</i>$tagunfont${tagbr}${tagbr}\n"
+					? "</pre></i>$tagunfont${tagbr}${tagbr}\n"
 					: ""
 				);
 			}
@@ -1345,7 +1342,7 @@ sub debug {
 }
 
 #------------------------------------------------------------------------------
-# Function:     Optimize an array removing duplicate entries
+# Function:     Optimize an array of precompiled regex by removing duplicate entries
 # Parameters:	@Array notcasesensitive=0|1
 # Input:        None
 # Output:		None
@@ -1353,9 +1350,7 @@ sub debug {
 #------------------------------------------------------------------------------
 sub OptimizeArray {
 	my $array = shift;
-	my @arrayunreg = map {
-		if (/\(\?[-\w]*:(.*)\)/) { $1 }
-	} @$array;
+	my @arrayunreg = map { UnCompileRegex($_) } @$array;
 	my $notcasesensitive = shift;
 	my $searchlist       = 0;
 	if ($Debug) {
@@ -1739,32 +1734,53 @@ sub Read_Config {
 	foreach (@PossibleConfigDir) {
 		my $searchdir = $_;
 		if ( $searchdir && $searchdir !~ /[\\\/]$/ ) { $searchdir .= "/"; }
-		if ( open( CONFIG, "$searchdir$PROG.$SiteConfig.conf" ) ) {
+		
+		if ( -f $searchdir.$PROG.".".$SiteConfig.".conf" &&  open( CONFIG, "$searchdir$PROG.$SiteConfig.conf" ) ) {
 			$FileConfig = "$searchdir$PROG.$SiteConfig.conf";
 			$FileSuffix = ".$SiteConfig";
 			if ($Debug){debug("Opened config: $searchdir$PROG.$SiteConfig.conf", 2);}
 			last;
 		}else{if ($Debug){debug("Unable to open config file: $searchdir$PROG.$SiteConfig.conf", 2);}}
-		if ( open( CONFIG, "$searchdir$PROG.conf" ) ) {
+		
+		if ( -f $searchdir.$PROG.".conf" &&  open( CONFIG, "$searchdir$PROG.conf" ) ) {
 			$FileConfig = "$searchdir$PROG.conf";
 			$FileSuffix = '';
-			if ($Debug){debug("Opened config: $searchdir$PROG.$SiteConfig.conf", 2);}
+			if ($Debug){debug("Opened config: $searchdir$PROG.conf", 2);}
 			last;
 		}else{if ($Debug){debug("Unable to open config file: $searchdir$PROG.conf", 2);}}
-		#CL - Added to open config if full path is passed to awstats 
-		if ( open( CONFIG, "$SiteConfig" ) ) {
-			$FileConfig = "$SiteConfig";
+		
+		# Added to open config if file name is passed to awstats 
+		if ( -f $searchdir.$SiteConfig && open( CONFIG, "$searchdir$SiteConfig" ) ) {
+			$FileConfig = "$searchdir$SiteConfig";
 			$FileSuffix = '';
-			if ($Debug){debug("Opened config: $SiteConfig", 2);}
+			if ($Debug){debug("Opened config: $searchdir$SiteConfig", 2);}
 			last;
-		}else{if ($Debug){debug("Unable to open config file: $SiteConfig", 2);}}
+		}else{if ($Debug){debug("Unable to open config file: $searchdir$SiteConfig", 2);}}
 	}
+	
+		#CL - Added to open config if full path is passed to awstats 
+	if ( !$FileConfig ) {
+		
+		my $SiteConfigBis = File::Spec->rel2abs($SiteConfig);
+		debug("Finally, try to open an absolute path : $SiteConfigBis", 2);
+	
+		if ( -f $SiteConfigBis && open(CONFIG, "$SiteConfigBis")) {
+			$FileConfig = "$SiteConfigBis";
+			$FileSuffix = '';
+			if ($Debug){debug("Opened config: $SiteConfigBis", 2);}
+			$SiteConfig=$SiteConfigBis;
+		}
+		else {
+			if ($Debug){debug("Unable to open config file: $SiteConfigBis", 2);}
+		}
+	}
+	
 	if ( !$FileConfig ) {
 		if ($DEBUGFORCED || !$ENV{'GATEWAY_INTERFACE'}){
 		error(
-"Couldn't open config file \"$PROG.$SiteConfig.conf\" nor \"$PROG.conf\" after searching in path \""
+"Couldn't open config file \"$PROG.$SiteConfig.conf\", nor \"$PROG.conf\", nor \"$SiteConfig\" after searching in path \""
 			  . join( ', ', @PossibleConfigDir )
-			  . "\": $!" );
+			  . ", $SiteConfig\": $!" );
 		}else{error("Couldn't open config file \"$PROG.$SiteConfig.conf\" nor \"$PROG.conf\". 
 		Please read the documentation for directories where the configuration file should be located."); }
 	}
@@ -1921,6 +1937,12 @@ sub Parse_Config {
 			$SiteDomain = $value;
 			next;
 		}
+		if ( $param =~ /^AddLinkToExternalCGIWrapper/ ) {
+
+			# No regex test as AddLinkToExternalCGIWrapper is always exact value
+			$AddLinkToExternalCGIWrapper = $value;
+			next;
+        }
 		if ( $param =~ /^HostAliases/ ) {
 			@HostAliases = ();
 			foreach my $elem ( split( /\s+/, $value ) ) {
@@ -2783,7 +2805,7 @@ sub Check_Config {
 	}
 	if ( $ShowLinksToWhoIs !~ /[01]/ ) { $ShowLinksToWhoIs = 0; }
 	$Logo     ||= 'awstats_logo6.png';
-	$LogoLink ||= 'http://awstats.sourceforge.net';
+	$LogoLink ||= 'http://www.awstats.org';
 	if ( $BarWidth !~ /^\d+/  || $BarWidth < 1 )  { $BarWidth  = 260; }
 	if ( $BarHeight !~ /^\d+/ || $BarHeight < 1 ) { $BarHeight = 90; }
 	$color_Background =~ s/#//g;
@@ -3652,7 +3674,7 @@ sub Read_History_With_TmpUpdate {
 		binmode HISTORYTMP;
 		if ($xml) {
 			print HISTORYTMP
-'<xml xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://awstats.sourceforge.net/files/awstats.xsd">'
+'<xml xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://www.awstats.org/files/awstats.xsd">'
 			  . "\n\n";
 		}
 		Save_History( "header", $year, $month, $date );
@@ -4631,6 +4653,7 @@ sub Read_History_With_TmpUpdate {
 							$countloaded++;
 							if ( $field[1] ) {
 								$_os_h{ $field[0] } += $field[1];
+								$_os_p{ $field[0] } += $field[2];
 							}
 						}
 					}
@@ -4659,7 +4682,7 @@ sub Read_History_With_TmpUpdate {
 				if ( $SectionsToSave{'os'} ) {
 					Save_History( 'os', $year, $month, $date );
 					delete $SectionsToSave{'os'};
-					if ($withpurge) { %_os_h = (); }
+					if ($withpurge) { %_os_h = (); %_os_p = (); }
 				}
 				if ( !scalar %SectionsToLoad ) {
 					debug(" Stop reading history file. Got all we need.");
@@ -4681,6 +4704,7 @@ sub Read_History_With_TmpUpdate {
 							$countloaded++;
 							if ( $field[1] ) {
 								$_browser_h{ $field[0] } += $field[1];
+								$_browser_p{ $field[0] } += $field[2];
 							}
 						}
 					}
@@ -4711,7 +4735,7 @@ sub Read_History_With_TmpUpdate {
 				if ( $SectionsToSave{'browser'} ) {
 					Save_History( 'browser', $year, $month, $date );
 					delete $SectionsToSave{'browser'};
-					if ($withpurge) { %_browser_h = (); }
+					if ($withpurge) { %_browser_h = (); %_browser_p = (); }
 				}
 				if ( !scalar %SectionsToLoad ) {
 					debug(" Stop reading history file. Got all we need.");
@@ -6912,11 +6936,13 @@ sub Save_History {
 		}
 		print HISTORYTMP "# OS ID - Hits\n";
 		$ValueInFile{$sectiontosave} = tell HISTORYTMP;
-		print HISTORYTMP "${xmlbb}BEGIN_OS${xmlbs}"
+		print HISTORYTMP "${xmlbb}BEGIN_OS ID - Hits - Pages${xmlbs}"
 		  . ( scalar keys %_os_h )
 		  . "${xmlbe}\n";
 		foreach ( keys %_os_h ) {
-			print HISTORYTMP "${xmlrb}$_${xmlrs}$_os_h{$_}${xmlre}\n";
+			my $hits        = $_os_h{$_}      || 0;
+			my $pages       = $_os_p{$_}      || 0;
+			print HISTORYTMP "${xmlrb}$_${xmlrs}$hits${xmlrs}$pages${xmlre}\n";
 		}
 		print HISTORYTMP "${xmleb}END_OS${xmlee}\n";
 	}
@@ -6925,13 +6951,15 @@ sub Save_History {
 		if ($xml) {
 			print HISTORYTMP "<section id='$sectiontosave'><comment>\n";
 		}
-		print HISTORYTMP "# Browser ID - Hits\n";
+		print HISTORYTMP "# Browser ID - Hits - Pages\n";
 		$ValueInFile{$sectiontosave} = tell HISTORYTMP;
 		print HISTORYTMP "${xmlbb}BEGIN_BROWSER${xmlbs}"
 		  . ( scalar keys %_browser_h )
 		  . "${xmlbe}\n";
 		foreach ( keys %_browser_h ) {
-			print HISTORYTMP "${xmlrb}$_${xmlrs}$_browser_h{$_}${xmlre}\n";
+			my $hits        = $_browser_h{$_}      || 0;
+			my $pages       = $_browser_p{$_}      || 0;
+			print HISTORYTMP "${xmlrb}$_${xmlrs}$hits${xmlrs}$pages${xmlre}\n";
 		}
 		print HISTORYTMP "${xmleb}END_BROWSER${xmlee}\n";
 	}
@@ -7671,12 +7699,12 @@ sub Init_HashArray {
 	}
 
 	# Reset all hash arrays with name beginning by _
-	%_session     = %_browser_h   = ();
+	%_session     = %_browser_h   = %_browser_p   = ();
 	%_domener_p   = %_domener_h   = %_domener_k = %_errors_h = %_errors_k = ();
 	%_filetypes_h = %_filetypes_k = %_filetypes_gz_in = %_filetypes_gz_out = ();
 	%_host_p = %_host_h = %_host_k = %_host_l = %_host_s = %_host_u = ();
 	%_waithost_e = %_waithost_l = %_waithost_s = %_waithost_u = ();
-	%_keyphrases = %_keywords   = %_os_h = %_pagesrefs_p = %_pagesrefs_h =
+	%_keyphrases = %_keywords   = %_os_h = %_os_p = %_pagesrefs_p = %_pagesrefs_h =
 	  %_robot_h  = %_robot_k    = %_robot_l = %_robot_r = ();
 	%_worm_h = %_worm_k = %_worm_l = %_login_p = %_login_h = %_login_k =
 	  %_login_l      = %_screensize_h   = ();
@@ -7802,14 +7830,15 @@ sub DecodeEncodedString {
 }
 
 #------------------------------------------------------------------------------
-# Function:     Decode an precompiled regex value to a common regex value
+# Function:     Decode a precompiled regex value to a common regex value
 # Parameters:   compiledregextodecode
 # Input:        None
 # Output:       None
 # Return:		standardregex
 #------------------------------------------------------------------------------
 sub UnCompileRegex {
-	shift =~ /\(\?[-\w]*:(.*)\)/;
+	shift =~ /\(\?[-^\w]*:(.*)\)/;         # Works with all perl
+	# shift =~ /\(\?[-\w]*:(.*)\)/;        < perl 5.14
 	return $1;
 }
 
@@ -8455,7 +8484,7 @@ sub PrintCLIHelp{
 		'browsers',       'domains', 'operating_systems', 'robots',
 		'search_engines', 'worms'
 	);
-	print "----- $PROG $VERSION (c) 2000-2010 Laurent Destailleur -----\n";
+	print "----- $PROG $VERSION (c) 2000-2013 Laurent Destailleur -----\n";
 	print
 "AWStats is a free web server logfile analyzer to show you advanced web\n";
 	print "statistics.\n";
@@ -8572,6 +8601,8 @@ sub PrintCLIHelp{
 	print "Other options:\n";
 	print
 "  -debug=X     to add debug informations lesser than level X (speed reduced)\n";
+	print
+"  -version     show AWStats version\n";
 	print "\n";
 	print "Now supports/detects:\n";
 	print
@@ -8605,7 +8636,7 @@ sub PrintCLIHelp{
 	print "  Dynamic or static HTML or XHTML reports, static PDF reports\n";
 	print "  Indexed text or XML monthly database\n";
 	print "  And a lot of other advanced features and options...\n";
-	print "New versions and FAQ at http://awstats.sourceforge.net\n";
+	print "New versions and FAQ at http://www.awstats.org\n";
 }
 
 #------------------------------------------------------------------------------
@@ -8787,7 +8818,7 @@ sub HTMLShowURLInfo {
 			{    # URL seems to be extracted from a proxy log file
 				print "<a href=\""
 				  . XMLEncode("$newkey")
-				  . "\" target=\"url\">"
+				  . "\" target=\"url\" rel=\"nofollow\">"
 				  . XMLEncode($nompage) . "</a>";
 			}
 			elsif ( $newkey =~ /^\// )
@@ -8802,7 +8833,7 @@ sub HTMLShowURLInfo {
 				}
 				print "<a href=\""
 				  . XMLEncode("$urlprot://$SiteDomain$newkey")
-				  . "\" target=\"url\">"
+				  . "\" target=\"url\" rel=\"nofollow\">"
 				  . XMLEncode($nompage) . "</a>";
 			}
 			else {
@@ -9066,6 +9097,16 @@ sub DefinePerlParsingFormat {
 				$i++;
 				push @fieldlib, 'date';
 				$PerlParsingFormat .= "(\\d+)";
+			}
+			elsif ( $f =~ /%time5$/ ) {    # yyyy-mm-ddThh:mm:ss+00:00 (iso format)
+				$pos_date = $i;
+				$i++;
+				push @fieldlib, 'date';
+				$pos_tz = $i;
+				$i++;
+				push @fieldlib, 'tz';
+				$PerlParsingFormat .=
+"([^$LogSeparatorWithoutStar]+T[^$LogSeparatorWithoutStar]+)([-+]\d\d:\d\d)";
 			}
 
 			# Special for methodurl and methodurlnoprot
@@ -9747,7 +9788,7 @@ sub HTMLTopBanner{
 		}
 		print "<form name=\"FormDateFilter\" action=\""
 		  . XMLEncode("$AWScript${NewLinkParams}")
-		  . "\" style=\"padding: 0px 0px 0px 0px; margin-top: 0\"$NewLinkTarget>\n";
+		  . "\" style=\"padding: 0px 0px 20px 0px; margin-top: 0\"$NewLinkTarget>\n";
 	}
 
 	if ( $QueryString !~ /buildpdf/i ) {
@@ -9781,7 +9822,7 @@ sub HTMLTopBanner{
 
 		# Logo and flags
 		if ( $FrameName ne 'mainleft' ) {
-			if ( $LogoLink =~ "http://awstats.sourceforge.net" ) {
+			if ( $LogoLink =~ "http://www.awstats.org" ) {
 				print "<td align=\"right\" rowspan=\"3\"><a href=\""
 				  . XMLEncode($LogoLink)
 				  . "\" target=\"awstatshome\"><img src=\"$DirIcons/other/$Logo\" border=\"0\""
@@ -9845,7 +9886,7 @@ sub HTMLTopBanner{
 
 		# Logo and flags
 		if ( $FrameName eq 'mainright' ) {
-			if ( $LogoLink =~ "http://awstats.sourceforge.net" ) {
+			if ( $LogoLink =~ "http://www.awstats.org" ) {
 				print "<td align=\"right\" rowspan=\"2\"><a href=\""
 				  . XMLEncode($LogoLink)
 				  . "\" target=\"awstatshome\"><img src=\"$DirIcons/other/$Logo\" border=\"0\""
@@ -9874,7 +9915,7 @@ sub HTMLTopBanner{
 				print "<option"
 				  . (
 					  "$MonthRequired" eq "$monthix"
-					? " selected=\"true\""
+					? " selected=\"selected\""
 					: ""
 				  )
 				  . " value=\"$monthix\">$MonthNumLib{$monthix}</option>\n";
@@ -9943,7 +9984,7 @@ sub HTMLTopBanner{
 		print "</table>\n";
 	}
 
-	if ( $FrameName ne 'mainleft' ) { print "</form>\n"; }
+	if ( $FrameName ne 'mainleft' ) { print "</form><br />\n"; }
 	else { print "<br />\n"; }
 	print "\n";
 }
@@ -10423,11 +10464,13 @@ sub HTMLMenu{
 #------------------------------------------------------------------------------
 # Function:     Prints the File Type table
 # Parameters:   _
-# Input:        _
+# Input:        $NewLinkParams, $NewLinkTargets
 # Output:       HTML
 # Return:       -
 #------------------------------------------------------------------------------
 sub HTMLMainFileType{
+    my $NewLinkParams = shift;
+    my $NewLinkTarget = shift;
 	if (!$LevelForFileTypesDetection > 0){return;}
 	if ($Debug) { debug( "ShowFileTypesStatsCompressionStats", 2 ); }
 	print "$Center<a name=\"filetypes\">&nbsp;</a><br />\n";
@@ -10436,6 +10479,15 @@ sub HTMLMainFileType{
 	my $Totalk = 0;
 	foreach ( keys %_filetypes_k ) { $Totalk += $_filetypes_k{$_}; }
 	my $title = "$Message[73]";
+    if ( $AddLinkToExternalCGIWrapper && ($ENV{'GATEWAY_INTERFACE'} || !$StaticLinks) ) {
+        # extend the title to include the added link 
+        $title = "$title &nbsp; - &nbsp; <a href=\"" . (XMLEncode(
+           "$AddLinkToExternalCGIWrapper" . "?section=FILETYPES&baseName=$DirData/$PROG"
+           . "&month=$MonthRequired&year=$YearRequired&day=$DayRequired"
+           . "&siteConfig=$SiteConfig" )
+           . "\"$NewLinkTarget>$Message[179]</a>");
+    } 
+
 	if ( $ShowFileTypesStats =~ /C/i ) { $title .= " - $Message[98]"; }
 	
 	# build keylist at top
@@ -10461,7 +10513,7 @@ sub HTMLMainFileType{
 			print "<tr><td colspan=\"7\">";
 			my $function = "ShowGraph_$pluginname";
 			&$function(
-				"$title",              "filetypes",
+				"$Message[73]",              "filetypes",
 				0, 						\@blocklabel,
 				0,           			\@valcolor,
 				0,              		0,
@@ -10601,28 +10653,40 @@ sub HTMLShowBrowserDetail{
 	print
 "<tr bgcolor=\"#$color_TableBGRowTitle\"><th colspan=\"2\">$Message[58]</th>";
 	print
-"<th width=\"80\">$Message[111]</th><th bgcolor=\"#$color_h\" width=\"80\">$Message[57]</th><th bgcolor=\"#$color_h\" width=\"80\">$Message[15]</th>";
+"<th width=\"80\">$Message[111]</th><th bgcolor=\"#$color_p\" width=\"80\">$Message[56]</th><th bgcolor=\"#$color_p\" width=\"80\">$Message[15]</th>";
+	print
+"<th bgcolor=\"#$color_h\" width=\"80\">$Message[57]</th><th bgcolor=\"#$color_h\" width=\"80\">$Message[15]</th>";
 	print "<th>&nbsp;</th>";
 	print "</tr>\n";
 	my $total_h = 0;
+	my $total_p = 0;
 	my $count = 0;
 	&BuildKeyList( MinimumButNoZero( scalar keys %_browser_h, 500 ),
-		1, \%_browser_h, \%_browser_h );
+		1, \%_browser_h, \%_browser_p );
 	my %keysinkeylist = ();
 	my $max_h = 1;
+	my $max_p = 1;
 
 	# Count total by family
 	my %totalfamily_h = ();
-	my $TotalFamily   = 0;
+	my %totalfamily_p = ();
+	my $TotalFamily_h = 0;
+	my $TotalFamily_p = 0;
   BROWSERLOOP: foreach my $key (@keylist) {
 		$total_h += $_browser_h{$key};
 		if ( $_browser_h{$key} > $max_h ) {
 			$max_h = $_browser_h{$key};
 		}
+		$total_p += $_browser_p{$key};
+		if ( $_browser_p{$key} > $max_p ) {
+			$max_p = $_browser_p{$key};
+		}
 		foreach my $family ( keys %BrowsersFamily ) {
 			if ( $key =~ /^$family/i ) {
 				$totalfamily_h{$family} += $_browser_h{$key};
-				$TotalFamily            += $_browser_h{$key};
+				$totalfamily_p{$family} += $_browser_p{$key};
+				$TotalFamily_h          += $_browser_h{$key};
+				$TotalFamily_p          += $_browser_p{$key};
 				next BROWSERLOOP;
 			}
 		}
@@ -10634,10 +10698,15 @@ sub HTMLShowBrowserDetail{
 		keys %BrowsersFamily
 	  )
 	{
-		my $p = '&nbsp;';
+		my $p_h = '&nbsp;';
+		my $p_p = '&nbsp;';
 		if ($total_h) {
-			$p = int( $totalfamily_h{$family} / $total_h * 1000 ) / 10;
-			$p = "$p %";
+			$p_h = int( $totalfamily_h{$family} / $total_h * 1000 ) / 10;
+			$p_h = "$p_h %";
+		}
+		if ($total_p) {
+			$p_p = int( $totalfamily_p{$family} / $total_p * 1000 ) / 10;
+			$p_p = "$p_p %";
 		}
 		my $familyheadershown = 0;
 
@@ -10650,18 +10719,27 @@ sub HTMLShowBrowserDetail{
 				  . uc($family)
 				  . "</b></td>";
 				print "<td>&nbsp;</td><td><b>"
+				  . Format_Number(int( $totalfamily_p{$family} ))
+				  . "</b></td><td><b>$p_p</b></td>";
+				print "<td><b>"
 				  . Format_Number(int( $totalfamily_h{$family} ))
-				  . "</b></td><td><b>$p</b></td><td>&nbsp;</td>";
+				  . "</b></td><td><b>$p_h</b></td><td>&nbsp;</td>";
 				print "</tr>\n";
 				$familyheadershown = 1;
 			}
 			$keysinkeylist{$key} = 1;
 			my $ver = $1;
-			my $p   = '&nbsp;';
+			my $p_h = '&nbsp;';
+			my $p_p = '&nbsp;';
 			if ($total_h) {
-				$p =
+				$p_h = 
 				  int( $_browser_h{$key} / $total_h * 1000 ) / 10;
-				$p = "$p %";
+				$p_h = "$p_h %";
+			}
+			if ($total_p) {
+				$p_p =
+				  int( $_browser_p{$key} / $total_p * 1000 ) / 10;
+				$p_p = "$p_p %";
 			}
 			print "<tr>";
 			print "<td"
@@ -10680,6 +10758,7 @@ sub HTMLShowBrowserDetail{
 			  )
 			  . "</td>";
 			my $bredde_h = 0;
+			my $bredde_p = 0;
 			if ( $max_h > 0 ) {
 				$bredde_h =
 				  int( $BarWidth * ( $_browser_h{$key} || 0 ) /
@@ -10688,11 +10767,22 @@ sub HTMLShowBrowserDetail{
 			if ( ( $bredde_h == 1 ) && $_browser_h{$key} ) {
 				$bredde_h = 2;
 			}
-			print "<td>".Format_Number($_browser_h{$key})."</td><td>$p</td>";
+			if ( $max_p > 0 ) {
+				$bredde_p =
+				  int( $BarWidth * ( $_browser_p{$key} || 0 ) /
+					  $max_p ) + 1;
+			}
+			if ( ( $bredde_p == 1 ) && $_browser_p{$key} ) {
+				$bredde_p = 2;
+			}
+			print "<td>".Format_Number($_browser_p{$key})."</td><td>$p_p</td>";
+			print "<td>".Format_Number($_browser_h{$key})."</td><td>$p_h</td>";
 			print "<td class=\"aws\">";
 
 			# alt and title are not provided to reduce page size
 			if ($ShowBrowsersStats) {
+				print
+"<img src=\"$DirIcons\/other\/$BarPng{'hp'}\" width=\"$bredde_p\" height=\"5\" /><br />";
 				print
 "<img src=\"$DirIcons\/other\/$BarPng{'hh'}\" width=\"$bredde_h\" height=\"5\" /><br />";
 				}
@@ -10708,25 +10798,40 @@ sub HTMLShowBrowserDetail{
 	foreach my $key (@keylist) {
 		if ( $keysinkeylist{$key} ) { next; }
 		if ( !$familyheadershown )  {
-			my $p = '&nbsp;';
-			if ($total_h) {
-				$p =
-				  int( ( $total_h - $TotalFamily ) / $total_h * 1000 ) /
+			my $p_h = '&nbsp;';
+			my $p_p = '&nbsp;';
+			if ($total_p) {
+				$p_p =
+				  int( ( $total_p - $TotalFamily_p ) / $total_p * 1000 ) /
 				  10;
-				$p = "$p %";
+				$p_p = "$p_p %";
+			}
+			if ($total_h) {
+				$p_h =
+				  int( ( $total_h - $TotalFamily_h ) / $total_h * 1000 ) /
+				  10;
+				$p_h = "$p_h %";
 			}
 			print
 "<tr bgcolor=\"#F6F6F6\"><td class=\"aws\" colspan=\"2\"><b>$Message[2]</b></td>";
 			print "<td>&nbsp;</td><td><b>"
-			  . Format_Number(( $total_h - $TotalFamily ))
-			  . "</b></td><td><b>$p</b></td><td>&nbsp;</td>";
+			  . Format_Number(( $total_p - $TotalFamily_p ))
+			  . "</b></td><td><b>$p_p</b></td>";
+			print "<td><b>"
+			  . Format_Number(( $total_h - $TotalFamily_h ))
+			  . "</b></td><td><b>$p_h</b></td><td>&nbsp;</td>";
 			print "</tr>\n";
 			$familyheadershown = 1;
 		}
-		my $p = '&nbsp;';
+		my $p_h = '&nbsp;';
+		my $p_p = '&nbsp;';
 		if ($total_h) {
-			$p = int( $_browser_h{$key} / $total_h * 1000 ) / 10;
-			$p = "$p %";
+			$p_h = int( $_browser_h{$key} / $total_h * 1000 ) / 10;
+			$p_h = "$p_h %";
+		}
+		if ($total_p) {
+			$p_p = int( $_browser_p{$key} / $total_p * 1000 ) / 10;
+			$p_p = "$p_p %";
 		}
 		print "<tr>";
 		if ( $key eq 'Unknown' ) {
@@ -10756,19 +10861,31 @@ sub HTMLShowBrowserDetail{
 			  . "</td>";
 		}
 		my $bredde_h = 0;
+		my $bredde_p = 0;
 		if ( $max_h > 0 ) {
 			$bredde_h =
 			  int( $BarWidth * ( $_browser_h{$key} || 0 ) / $max_h ) +
 			  1;
 		}
+		if ( $max_p > 0 ) {
+			$bredde_p =
+			  int( $BarWidth * ( $_browser_p{$key} || 0 ) / $max_p ) +
+			  1;
+		}
 		if ( ( $bredde_h == 1 ) && $_browser_h{$key} ) {
 			$bredde_h = 2;
 		}
-		print "<td>".Format_Number($_browser_h{$key})."</td><td>$p</td>";
+		if ( ( $bredde_p == 1 ) && $_browser_p{$key} ) {
+			$bredde_p = 2;
+		}
+		print "<td>".Format_Number($_browser_p{$key})."</td><td>$p_p</td>";
+		print "<td>".Format_Number($_browser_h{$key})."</td><td>$p_h</td>";
 		print "<td class=\"aws\">";
 
 		# alt and title are not provided to reduce page size
 		if ($ShowBrowsersStats) {
+			print
+"<img src=\"$DirIcons\/other\/$BarPng{'hp'}\" width=\"$bredde_p\" height=\"5\" /><br />";
 			print
 "<img src=\"$DirIcons\/other\/$BarPng{'hh'}\" width=\"$bredde_h\" height=\"5\" /><br />";
 		}
@@ -10781,14 +10898,23 @@ sub HTMLShowBrowserDetail{
 
 #------------------------------------------------------------------------------
 # Function:     Prints the Unknown Browser Detail frame or static page
-# Parameters:   _
+# Parameters:   $NewLinkTarget
 # Input:        _
 # Output:       HTML
 # Return:       -
 #------------------------------------------------------------------------------
 sub HTMLShowBrowserUnknown{
+    my $NewLinkTarget = shift;
 	print "$Center<a name=\"unknownbrowser\">&nbsp;</a><br />\n";
 	my $title = "$Message[50]";
+    if ( $AddLinkToExternalCGIWrapper && ($ENV{'GATEWAY_INTERFACE'} || !$StaticLinks) ) {
+       # extend the title to include the added link 
+           $title = "$title &nbsp; - &nbsp; <a href=\"" . (XMLEncode(
+               "$AddLinkToExternalCGIWrapper" . "?section=UNKNOWNREFERERBROWSER&baseName=$DirData/$PROG"
+           . "&month=$MonthRequired&year=$YearRequired&day=$DayRequired"
+           . "&siteConfig=$SiteConfig" )
+           . "\"$NewLinkTarget>$Message[179]</a>");
+    } 
 	&tab_head( "$title", 19, 0, 'unknownbrowser' );
 	print "<tr bgcolor=\"#$color_TableBGRowTitle\"><th>User agent ("
 	  . ( scalar keys %_unknownrefererbrowser_l )
@@ -10832,26 +10958,35 @@ sub HTMLShowOSDetail{
 	print
 "<tr bgcolor=\"#$color_TableBGRowTitle\"><th colspan=\"2\">$Message[58]</th>";
 	print
+"<th bgcolor=\"#$color_p\" width=\"80\">$Message[56]</th><th bgcolor=\"#$color_p\" width=\"80\">$Message[15]</th>";
+	print
 "<th bgcolor=\"#$color_h\" width=\"80\">$Message[57]</th><th bgcolor=\"#$color_h\" width=\"80\">$Message[15]</th>";
-	print "<th>&nbsp;</th>";
 	print "</tr>\n";
 	my $total_h = 0;
+	my $total_p = 0;
 	my $count = 0;
 	&BuildKeyList( MinimumButNoZero( scalar keys %_os_h, 500 ),
-		1, \%_os_h, \%_os_h );
+		1, \%_os_h, \%_os_p );
 	my %keysinkeylist = ();
 	my $max_h = 1;
+	my $max_p = 1;
 
 	# Count total by family
 	my %totalfamily_h = ();
-	my $TotalFamily   = 0;
+	my %totalfamily_p = ();
+	my $TotalFamily_h = 0;
+	my $TotalFamily_p = 0;
   OSLOOP: foreach my $key (@keylist) {
 		$total_h += $_os_h{$key};
+		$total_p += $_os_p{$key};
 		if ( $_os_h{$key} > $max_h ) { $max_h = $_os_h{$key}; }
+		if ( $_os_p{$key} > $max_p ) { $max_p = $_os_p{$key}; }
 		foreach my $family ( keys %OSFamily ) {
 			if ( $key =~ /^$family/i ) {
 				$totalfamily_h{$family} += $_os_h{$key};
-				$TotalFamily            += $_os_h{$key};
+				$totalfamily_p{$family} += $_os_p{$key};
+				$TotalFamily_h          += $_os_h{$key};
+				$TotalFamily_p          += $_os_p{$key};
 				next OSLOOP;
 			}
 		}
@@ -10859,10 +10994,15 @@ sub HTMLShowOSDetail{
 
 	# Write records grouped in a browser family
 	foreach my $family ( keys %OSFamily ) {
-		my $p = '&nbsp;';
+		my $p_h = '&nbsp;';
+		my $p_p = '&nbsp;';
 		if ($total_h) {
-			$p = int( $totalfamily_h{$family} / $total_h * 1000 ) / 10;
-			$p = "$p %";
+			$p_h = int( $totalfamily_h{$family} / $total_h * 1000 ) / 10;
+			$p_h = "$p_h %";
+		}
+		if ($total_p) {
+			$p_p = int( $totalfamily_p{$family} / $total_p * 1000 ) / 10;
+			$p_p = "$p_p %";
 		}
 		my $familyheadershown = 0;
 		foreach my $key ( reverse sort keys %_os_h ) {
@@ -10875,17 +11015,25 @@ sub HTMLShowOSDetail{
 					print
 "<tr bgcolor=\"#F6F6F6\"><td class=\"aws\" colspan=\"2\"><b>$family_name</b></td>";
 					print "<td><b>"
+					  . Format_Number(int( $totalfamily_p{$family} ))
+					  . "</b></td><td><b>$p_p</b></td>";
+					print "<td><b>"
 					  . Format_Number(int( $totalfamily_h{$family} ))
-					  . "</b></td><td><b>$p</b></td><td>&nbsp;</td>";
+					  . "</b></td><td><b>$p_h</b></td><td>&nbsp;</td>";
 					print "</tr>\n";
 					$familyheadershown = 1;
 				}
 				$keysinkeylist{$key} = 1;
 				my $ver = $1;
-				my $p   = '&nbsp;';
+				my $p_h = '&nbsp;';
+				my $p_p = '&nbsp;';
 				if ($total_h) {
-					$p = int( $_os_h{$key} / $total_h * 1000 ) / 10;
-					$p = "$p %";
+					$p_h = int( $_os_h{$key} / $total_h * 1000 ) / 10;
+					$p_h = "$p_h %";
+				}
+				if ($total_p) {
+					$p_p = int( $_os_p{$key} / $total_p * 1000 ) / 10;
+					$p_p = "$p_p %";
 				}
 				print "<tr>";
 				print "<td"
@@ -10896,6 +11044,7 @@ sub HTMLShowOSDetail{
 
 				print "<td class=\"aws\">$OSHashLib{$key}</td>";
 				my $bredde_h = 0;
+				my $bredde_p = 0;
 				if ( $max_h > 0 ) {
 					$bredde_h =
 					  int( $BarWidth * ( $_os_h{$key} || 0 ) / $max_h )
@@ -10904,11 +11053,22 @@ sub HTMLShowOSDetail{
 				if ( ( $bredde_h == 1 ) && $_os_h{$key} ) {
 					$bredde_h = 2;
 				}
-				print "<td>".Format_Number($_os_h{$key})."</td><td>$p</td>";
+				if ( $max_p > 0 ) {
+					$bredde_p =
+					  int( $BarWidth * ( $_os_p{$key} || 0 ) / $max_p )
+					  + 1;
+				}
+				if ( ( $bredde_p == 1 ) && $_os_p{$key} ) {
+					$bredde_p = 2;
+				}
+				print "<td>".Format_Number($_os_p{$key})."</td><td>$p_p</td>";
+				print "<td>".Format_Number($_os_h{$key})."</td><td>$p_h</td>";
 				print "<td class=\"aws\">";
 
 				# alt and title are not provided to reduce page size
 				if ($ShowOSStats) {
+					print
+"<img src=\"$DirIcons\/other\/$BarPng{'hp'}\" width=\"$bredde_p\" height=\"5\" /><br />";
 					print
 "<img src=\"$DirIcons\/other\/$BarPng{'hh'}\" width=\"$bredde_h\" height=\"5\" /><br />";
 				}
@@ -10924,25 +11084,40 @@ sub HTMLShowOSDetail{
 	foreach my $key (@keylist) {
 		if ( $keysinkeylist{$key} ) { next; }
 		if ( !$familyheadershown )  {
-			my $p = '&nbsp;';
+			my $p_h = '&nbsp;';
+			my $p_p = '&nbsp;';
 			if ($total_h) {
-				$p =
-				  int( ( $total_h - $TotalFamily ) / $total_h * 1000 ) /
+				$p_h =
+				  int( ( $total_h - $TotalFamily_h ) / $total_h * 1000 ) /
 				  10;
-				$p = "$p %";
+				$p_h = "$p_h %";
+			}
+			if ($total_p) {
+				$p_p =
+				  int( ( $total_p - $TotalFamily_p ) / $total_p * 1000 ) /
+				  10;
+				$p_p = "$p_p %";
 			}
 			print
 "<tr bgcolor=\"#F6F6F6\"><td class=\"aws\" colspan=\"2\"><b>$Message[2]</b></td>";
 			print "<td><b>"
-			  . Format_Number(( $total_h - $TotalFamily ))
-			  . "</b></td><td><b>$p</b></td><td>&nbsp;</td>";
+			  . Format_Number(( $total_p - $TotalFamily_p ))
+			  . "</b></td><td><b>$p_p</b></td>";
+			print "<td><b>"
+			  . Format_Number(( $total_h - $TotalFamily_h ))
+			  . "</b></td><td><b>$p_h</b></td><td>&nbsp;</td>";
 			print "</tr>\n";
 			$familyheadershown = 1;
 		}
-		my $p = '&nbsp;';
+		my $p_h = '&nbsp;';
+		my $p_p = '&nbsp;';
 		if ($total_h) {
-			$p = int( $_os_h{$key} / $total_h * 1000 ) / 10;
-			$p = "$p %";
+			$p_h = int( $_os_h{$key} / $total_h * 1000 ) / 10;
+			$p_h = "$p_h %";
+		}
+		if ($total_p) {
+			$p_p = int( $_os_p{$key} / $total_p * 1000 ) / 10;
+			$p_p = "$p_p %";
 		}
 		print "<tr>";
 		if ( $key eq 'Unknown' ) {
@@ -10966,16 +11141,25 @@ sub HTMLShowOSDetail{
 			  . " /></td><td class=\"aws\">$libos</td>";
 		}
 		my $bredde_h = 0;
+		my $bredde_p = 0;
 		if ( $max_h > 0 ) {
 			$bredde_h =
 			  int( $BarWidth * ( $_os_h{$key} || 0 ) / $max_h ) + 1;
 		}
 		if ( ( $bredde_h == 1 ) && $_os_h{$key} ) { $bredde_h = 2; }
-		print "<td>".Format_Number($_os_h{$key})."</td><td>$p</td>";
+		if ( $max_p > 0 ) {
+			$bredde_p =
+			  int( $BarWidth * ( $_os_p{$key} || 0 ) / $max_p ) + 1;
+		}
+		if ( ( $bredde_p == 1 ) && $_os_p{$key} ) { $bredde_p = 2; }
+		print "<td>".Format_Number($_os_p{$key})."</td><td>$p_p</td>";
+		print "<td>".Format_Number($_os_h{$key})."</td><td>$p_h</td>";
 		print "<td class=\"aws\">";
 
 		# alt and title are not provided to reduce page size
 		if ($ShowOSStats) {
+			print
+"<img src=\"$DirIcons\/other\/$BarPng{'hp'}\" width=\"$bredde_p\" height=\"5\" /><br />";
 			print
 "<img src=\"$DirIcons\/other\/$BarPng{'hh'}\" width=\"$bredde_h\" height=\"5\" /><br />";
 		}
@@ -10988,15 +11172,24 @@ sub HTMLShowOSDetail{
 
 #------------------------------------------------------------------------------
 # Function:     Prints the Unkown OS Detail frame or static page
-# Parameters:   _
+# Parameters:   $NewLinkTarget
 # Input:        _
 # Output:       HTML
 # Return:       -
 #------------------------------------------------------------------------------
 sub HTMLShowOSUnknown{
+    my $NewLinkTarget = shift;
 	print "$Center<a name=\"unknownos\">&nbsp;</a><br />\n";
 	my $title = "$Message[46]";
-	&tab_head( "$title", 19, 0, 'unknownos' );
+    if ( $AddLinkToExternalCGIWrapper && ($ENV{'GATEWAY_INTERFACE'} || !$StaticLinks) ) {
+       # extend the title to include the added link 
+           $title = "$title &nbsp; - &nbsp; <a href=\"" . (XMLEncode(
+               "$AddLinkToExternalCGIWrapper" . "?section=UNKNOWNREFERER&baseName=$DirData/$PROG"
+           . "&month=$MonthRequired&year=$YearRequired&day=$DayRequired"
+           . "&siteConfig=$SiteConfig" )
+           . "\"$NewLinkTarget>$Message[179]</a>");
+    } 
+    &tab_head( "$title", 19, 0, 'unknownos' );
 	print "<tr bgcolor=\"#$color_TableBGRowTitle\"><th>User agent ("
 	  . ( scalar keys %_unknownreferer_l )
 	  . ")</th><th>$Message[9]</th></tr>\n";
@@ -11026,15 +11219,24 @@ sub HTMLShowOSUnknown{
 
 #------------------------------------------------------------------------------
 # Function:     Prints the Referers frame or static page
-# Parameters:   _
+# Parameters:   $NewLinkTarget
 # Input:        _
 # Output:       HTML
 # Return:       -
 #------------------------------------------------------------------------------
 sub HTMLShowReferers{
+    my $NewLinkTarget = shift;
 	print "$Center<a name=\"refererse\">&nbsp;</a><br />\n";
 	my $title = "$Message[40]";
-	&tab_head( "$title", 19, 0, 'refererse' );
+    if ( $AddLinkToExternalCGIWrapper && ($ENV{'GATEWAY_INTERFACE'} || !$StaticLinks) ) {
+       # extend the title to include the added link 
+           $title = "$title &nbsp; - &nbsp; <a href=\"" . (XMLEncode(
+               "$AddLinkToExternalCGIWrapper" . "?section=SEREFERRALS&baseName=$DirData/$PROG"
+           . "&month=$MonthRequired&year=$YearRequired&day=$DayRequired"
+           . "&siteConfig=$SiteConfig" )
+           . "\"$NewLinkTarget>$Message[179]</a>");
+    } 
+    &tab_head( $title, 19, 0, 'refererse' );
 	print
 "<tr bgcolor=\"#$color_TableBGRowTitle\"><th>".Format_Number($TotalDifferentSearchEngines)." $Message[122]</th>";
 	print
@@ -11119,12 +11321,13 @@ sub HTMLShowReferers{
 
 #------------------------------------------------------------------------------
 # Function:     Prints the Referer Pages frame or static page
-# Parameters:   _
+# Parameters:   $NewLinkTarget
 # Input:        _
 # Output:       HTML
 # Return:       -
 #------------------------------------------------------------------------------
 sub HTMLShowRefererPages{
+    my $NewLinkTarget = shift;
 	print "$Center<a name=\"refererpages\">&nbsp;</a><br />\n";
 	my $total_p = 0;
 	my $total_h = 0;
@@ -11138,7 +11341,15 @@ sub HTMLShowRefererPages{
 		$FilterEx{'refererpages'}
 	);
 	my $title = "$Message[41]";
-	my $cpt   = 0;
+    if ( $AddLinkToExternalCGIWrapper && ($ENV{'GATEWAY_INTERFACE'} || !$StaticLinks) ) {
+       # extend the title to include the added link 
+           $title = "$title &nbsp; - &nbsp; <a href=\"" . (XMLEncode(
+               "$AddLinkToExternalCGIWrapper" . "?section=PAGEREFS&baseName=$DirData/$PROG"
+           . "&month=$MonthRequired&year=$YearRequired&day=$DayRequired"
+           . "&siteConfig=$SiteConfig" )
+           . "\"$NewLinkTarget>$Message[179]</a>");
+    }
+    my $cpt   = 0;
 	$cpt = ( scalar keys %_pagesrefs_h );
 	&tab_head( "$title", 19, 0, 'refererpages' );
 	print "<tr bgcolor=\"#$color_TableBGRowTitle\"><th>";
@@ -11248,14 +11459,24 @@ sub HTMLShowRefererPages{
 
 #------------------------------------------------------------------------------
 # Function:     Prints the Key Phrases frame or static page
-# Parameters:   _
+# Parameters:   $NewLinkTarget
 # Input:        _
 # Output:       HTML
 # Return:       -
 #------------------------------------------------------------------------------
 sub HTMLShowKeyPhrases{
+	my $NewLinkTarget = shift;
 	print "$Center<a name=\"keyphrases\">&nbsp;</a><br />\n";
-	&tab_head( $Message[43], 19, 0, 'keyphrases' );
+    my $title = "$Message[43]";
+    if ( $AddLinkToExternalCGIWrapper && ($ENV{'GATEWAY_INTERFACE'} || !$StaticLinks) ) {
+       # extend the title to include the added link 
+           $title = "$title &nbsp; - &nbsp; <a href=\"" . (XMLEncode(
+               "$AddLinkToExternalCGIWrapper" . "?section=SEARCHWORDS&baseName=$DirData/$PROG"
+           . "&month=$MonthRequired&year=$YearRequired&day=$DayRequired"
+           . "&siteConfig=$SiteConfig" )
+           . "\"$NewLinkTarget>$Message[179]</a>");
+    } 
+	&tab_head( $title, 19, 0, 'keyphrases' );
 	print "<tr bgcolor=\"#$color_TableBGRowTitle\""
 	  . Tooltip(15)
 	  . "><th>".Format_Number($TotalDifferentKeyphrases)." $Message[103]</th><th bgcolor=\"#$color_s\" width=\"80\">$Message[14]</th><th bgcolor=\"#$color_s\" width=\"80\">$Message[15]</th></tr>\n";
@@ -11306,14 +11527,24 @@ sub HTMLShowKeyPhrases{
 
 #------------------------------------------------------------------------------
 # Function:     Prints the Keywords frame or static page
-# Parameters:   _
+# Parameters:   $NewLinkTarget
 # Input:        _
 # Output:       HTML
 # Return:       -
 #------------------------------------------------------------------------------
 sub HTMLShowKeywords{
+	my $NewLinkTarget = shift;
 	print "$Center<a name=\"keywords\">&nbsp;</a><br />\n";
-	&tab_head( $Message[44], 19, 0, 'keywords' );
+	my $title = "$Message[44]";
+    if ( $AddLinkToExternalCGIWrapper && ($ENV{'GATEWAY_INTERFACE'} || !$StaticLinks) ) {
+       # extend the title to include the added link 
+           $title = "$title &nbsp; - &nbsp; <a href=\"" . (XMLEncode(
+               "$AddLinkToExternalCGIWrapper" . "?section=KEYWORDS&baseName=$DirData/$PROG"
+           . "&month=$MonthRequired&year=$YearRequired&day=$DayRequired"
+           . "&siteConfig=$SiteConfig" )
+           . "\"$NewLinkTarget>$Message[179]</a>");
+    } 
+	&tab_head( $title, 19, 0, 'keywords' );
 	print "<tr bgcolor=\"#$color_TableBGRowTitle\""
 	  . Tooltip(15)
 	  . "><th>".Format_Number($TotalDifferentKeywords)." $Message[13]</th><th bgcolor=\"#$color_s\" width=\"80\">$Message[14]</th><th bgcolor=\"#$color_s\" width=\"80\">$Message[15]</th></tr>\n";
@@ -11966,11 +12197,11 @@ sub HTMLShowLogins{
 	$total_p = $total_h = $total_k = 0;
 	my $count = 0;
 	if ( $HTMLOutput{'alllogins'} ) {
-		&BuildKeyList( $MaxRowsInHTMLOutput, $MinHit{'Host'},
+		&BuildKeyList( $MaxRowsInHTMLOutput, $MinHit{'Login'},
 			\%_login_h, \%_login_p );
 	}
 	if ( $HTMLOutput{'lastlogins'} ) {
-		&BuildKeyList( $MaxRowsInHTMLOutput, $MinHit{'Host'},
+		&BuildKeyList( $MaxRowsInHTMLOutput, $MinHit{'Login'},
 			\%_login_h, \%_login_l );
 	}
 	foreach my $key (@keylist) {
@@ -13010,13 +13241,13 @@ sub HTMLMainMonthly{
 				!$StaticLinks
 				  && $monthix == $nowmonth
 				  && $YearRequired == $nowyear
-				? '<font class="currentday">'
+				? '<span class="currentday">'
 				: ''
 			  );
 			print "$MonthNumLib{$monthix}<br />$YearRequired";
 			print(   !$StaticLinks
 				  && $monthix == $nowmonth
-				  && $YearRequired == $nowyear ? '</font>' : '' );
+				  && $YearRequired == $nowyear ? '</span>' : '' );
 			print "</td>";
 
 			#					}
@@ -13073,13 +13304,13 @@ sub HTMLMainMonthly{
 				!$StaticLinks
 				  && $monthix == $nowmonth
 				  && $YearRequired == $nowyear
-				? '<font class="currentday">'
+				? '<span class="currentday">'
 				: ''
 			  );
 			print "$MonthNumLib{$monthix} $YearRequired";
 			print(   !$StaticLinks
 				  && $monthix == $nowmonth
-				  && $YearRequired == $nowyear ? '</font>' : '' );
+				  && $YearRequired == $nowyear ? '</span>' : '' );
 			print "</td>";
 			if ( $ShowMonthStats =~ /U/i ) {
 				print "<td>",
@@ -13164,11 +13395,6 @@ sub HTMLMainDaily{
 	
 	if ($Debug) { debug( "ShowDaysOfMonthStats", 2 ); }
 	print "$Center<a name=\"daysofmonth\">&nbsp;</a><br />\n";
-	my $title = "$Message[138]";
-	&tab_head( "$title", 0, 0, 'daysofmonth' );
-	print "<tr>";
-	print "<td align=\"center\">\n";
-	print "<center>\n";
 
 	my $NewLinkParams = ${QueryString};
 	$NewLinkParams =~ s/(^|&|&amp;)update(=\w*|$)//i;
@@ -13186,6 +13412,22 @@ sub HTMLMainDaily{
 		$NewLinkTarget = " target=\"_parent\"";
 	}
 
+	my $title = "$Message[138]";
+
+    if ($AddLinkToExternalCGIWrapper && ($ENV{'GATEWAY_INTERFACE'} || !$StaticLinks) ) {
+        # extend the title to include the added link
+            $title = "$title &nbsp; - &nbsp; <a href=\"".(XMLEncode(
+                "$AddLinkToExternalCGIWrapper". "?section=DAY&baseName=$DirData/$PROG"
+           . "&month=$MonthRequired&year=$YearRequired&day=$DayRequired"
+           . "&siteConfig=$SiteConfig" )
+           . "\"$NewLinkTarget>$Message[179]</a>");
+    }
+
+	&tab_head( "$title", 0, 0, 'daysofmonth' );
+	print "<tr>";
+	print "<td align=\"center\">\n";
+	print "<center>\n";
+	
 	my $average_v = my $average_p = 0;
 	my $average_h = my $average_k = 0;
 	my $total_u = my $total_v = my $total_p = my $total_h = my $total_k = 0;
@@ -13426,7 +13668,7 @@ sub HTMLMainDaily{
 				  && $day == $nowday
 				  && $month == $nowmonth
 				  && $year == $nowyear
-				? '<font class="currentday">'
+				? '<span class="currentday">'
 				: ''
 			);
 			print "$day<br /><span style=\"font-size: "
@@ -13438,7 +13680,7 @@ sub HTMLMainDaily{
 			print(   !$StaticLinks
 				  && $day == $nowday
 				  && $month == $nowmonth
-				  && $year == $nowyear ? '</font>' : '' );
+				  && $year == $nowyear ? '</span>' : '' );
 			print "</td>\n";
 		}
 		print "<td>&nbsp;</td>";
@@ -13500,14 +13742,14 @@ sub HTMLMainDaily{
 				  && $day == $nowday
 				  && $month == $nowmonth
 				  && $year == $nowyear
-				? '<font class="currentday">'
+				? '<span class="currentday">'
 				: ''
 			  );
 			print Format_Date( "$year$month$day" . "000000", 2 );
 			print(   !$StaticLinks
 				  && $day == $nowday
 				  && $month == $nowmonth
-				  && $year == $nowyear ? '</font>' : '' );
+				  && $year == $nowyear ? '</span>' : '' );
 			print "</td>";
 			if ( $ShowDaysOfMonthStats =~ /V/i ) {
 				print "<td>",
@@ -13587,6 +13829,9 @@ sub HTMLMainDaily{
 sub HTMLMainDaysofWeek{
 	my $firstdaytocountaverage = shift;
 	my $lastdaytocountaverage = shift;
+    my $NewLinkParams = shift;
+    my $NewLinkTarget = shift;	
+    
 	if ($Debug) { debug( "ShowDaysOfWeekStats", 2 ); }
 			print "$Center<a name=\"daysofweek\">&nbsp;</a><br />\n";
 			my $title = "$Message[91]";
@@ -13803,14 +14048,14 @@ sub HTMLMainDaysofWeek{
 						  && $_ == ( $nowwday - 1 )
 						  && $MonthRequired == $nowmonth
 						  && $YearRequired == $nowyear
-						? '<font class="currentday">'
+						? '<span class="currentday">'
 						: ''
 					  );
 					print $Message[ $_ + 84 ];
 					print(   !$StaticLinks
 						  && $_ == ( $nowwday - 1 )
 						  && $MonthRequired == $nowmonth
-						  && $YearRequired == $nowyear ? '</font>' : '' );
+						  && $YearRequired == $nowyear ? '</span>' : '' );
 					print "</td>";
 				}
 				print "</tr>\n</table>\n";
@@ -13847,14 +14092,14 @@ sub HTMLMainDaysofWeek{
 						  && $_ == ( $nowwday - 1 )
 						  && $MonthRequired == $nowmonth
 						  && $YearRequired == $nowyear
-						? '<font class="currentday">'
+						? '<span class="currentday">'
 						: ''
 					  );
 					print $Message[ $_ + 84 ];
 					print(   !$StaticLinks
 						  && $_ == ( $nowwday - 1 )
 						  && $MonthRequired == $nowmonth
-						  && $YearRequired == $nowyear ? '</font>' : '' );
+						  && $YearRequired == $nowyear ? '</span>' : '' );
 					print "</td>";
 					if ( $ShowDaysOfWeekStats =~ /P/i ) {
 						print "<td>", Format_Number(int($avg_dayofweek_p[$_])), "</td>";
@@ -13879,7 +14124,7 @@ sub HTMLMainDaysofWeek{
 #------------------------------------------------------------------------------
 # Function:     Prints the Downloads chart and table
 # Parameters:   -
-# Input:        -
+# Input:        $NewLinkParams, $NewLinkTarget
 # Output:       HTML
 # Return:       -
 #------------------------------------------------------------------------------
@@ -13901,6 +14146,16 @@ sub HTMLMainDownloads{
 		: "$StaticLinks.downloads.$StaticExt"
 	  )
 	  . "\"$NewLinkTarget>$Message[80]</a>";
+
+    if ( $AddLinkToExternalCGIWrapper && ($ENV{'GATEWAY_INTERFACE'} || !$StaticLinks) ) {
+        # extend the title to include the added link
+            $title = "$title &nbsp; - &nbsp; <a href=\"" . (XMLEncode(
+                "$AddLinkToExternalCGIWrapper" . "?section=DOWNLOADS&baseName=$DirData/$PROG"
+            . "&month=$MonthRequired&year=$YearRequired&day=$DayRequired"
+            . "&siteConfig=$SiteConfig" )
+            . "\"$NewLinkTarget>$Message[179]</a>");
+    }
+	  
 	&tab_head( "$title", 0, 0, 'downloads' );
 	my $cnt=0;
 	for my $u (sort {$_downloads{$b}->{'AWSTATS_HITS'} <=> $_downloads{$a}->{'AWSTATS_HITS'}}(keys %_downloads) ){
@@ -13988,15 +14243,28 @@ sub HTMLMainDownloads{
 
 #------------------------------------------------------------------------------
 # Function:     Prints the hours chart and table
-# Parameters:   -
+# Parameters:   $NewLinkParams, $NewLinkTarget
 # Input:        -
 # Output:       HTML
 # Return:       -
 #------------------------------------------------------------------------------
 sub HTMLMainHours{
-	if ($Debug) { debug( "ShowHoursStats", 2 ); }
+    my $NewLinkParams = shift;
+    my $NewLinkTarget = shift;
+        
+    if ($Debug) { debug( "ShowHoursStats", 2 ); }
 	print "$Center<a name=\"hours\">&nbsp;</a><br />\n";
 	my $title = "$Message[20]";
+	
+    if ( $AddLinkToExternalCGIWrapper && ($ENV{'GATEWAY_INTERFACE'} || !$StaticLinks) ) {
+       # extend the title to include the added link 
+           $title = "$title &nbsp; - &nbsp; <a href=\"" . (XMLEncode(
+               "$AddLinkToExternalCGIWrapper" . "?section=TIME&baseName=$DirData/$PROG"
+           . "&month=$MonthRequired&year=$YearRequired&day=$DayRequired"
+           . "&siteConfig=$SiteConfig" )
+           . "\"$NewLinkTarget>$Message[179]</a>");
+    } 
+	
 	if ( $PluginsLoaded{'GetTimeZoneTitle'}{'timezone'} ) {
 		$title .= " (GMT "
 		  . ( GetTimeZoneTitle_timezone() >= 0 ? "+" : "" )
@@ -14229,6 +14497,17 @@ sub HTMLMainCountries{
 		: "$StaticLinks.alldomains.$StaticExt"
 	  )
 	  . "\"$NewLinkTarget>$Message[80]</a>";
+	  
+
+    if ( $AddLinkToExternalCGIWrapper && ($ENV{'GATEWAY_INTERFACE'} || !$StaticLinks) ) {
+       # extend the title to include the added link
+           $title = "$title &nbsp; - &nbsp; <a href=\"" . (XMLEncode(
+               "$AddLinkToExternalCGIWrapper" . "?section=DOMAIN&baseName=$DirData/$PROG"
+           . "&month=$MonthRequired&year=$YearRequired&day=$DayRequired"
+           . "&siteConfig=$SiteConfig" )
+           . "\"$NewLinkTarget>$Message[179]</a>");
+    }
+        	  
 	&tab_head( "$title", 19, 0, 'countries' );
 	
 	my $total_u = my $total_v = my $total_p = my $total_h = my $total_k = 0;
@@ -14473,6 +14752,16 @@ sub HTMLMainHosts{
 		: "$StaticLinks.unknownip.$StaticExt"
 	  )
 	  . "\"$NewLinkTarget>$Message[45]</a>";
+	  
+    if ( $AddLinkToExternalCGIWrapper && ($ENV{'GATEWAY_INTERFACE'} || !$StaticLinks) ) {
+       # extend the title to include the added link
+           $title = "$title &nbsp; - &nbsp; <a href=\"" . (XMLEncode(
+               "$AddLinkToExternalCGIWrapper" . "?section=VISITOR&baseName=$DirData/$PROG"
+           . "&month=$MonthRequired&year=$YearRequired&day=$DayRequired"
+           . "&siteConfig=$SiteConfig" )
+           . "\"$NewLinkTarget>$Message[179]</a>");
+    }
+	  
 	&tab_head( "$title", 19, 0, 'visitors' );
 	
 	&BuildKeyList( $MaxNbOf{'HostsShown'}, $MinHit{'Host'}, \%_host_h,
@@ -14735,8 +15024,8 @@ sub HTMLMainRobots{
 	
 	if ($Debug) { debug( "ShowRobotStats", 2 ); }
 	print "$Center<a name=\"robots\">&nbsp;</a><br />\n";
-	&tab_head(
-"$Message[53] ($Message[77] $MaxNbOf{'RobotShown'}) &nbsp; - &nbsp; <a href=\""
+
+	my $title = "$Message[53] ($Message[77] $MaxNbOf{'RobotShown'}) &nbsp; - &nbsp; <a href=\""
 		  . (
 			$ENV{'GATEWAY_INTERFACE'}
 			  || !$StaticLinks
@@ -14750,10 +15039,20 @@ sub HTMLMainRobots{
 			? XMLEncode("$AWScript${NewLinkParams}output=lastrobots")
 			: "$StaticLinks.lastrobots.$StaticExt"
 		  )
-		  . "\"$NewLinkTarget>$Message[9]</a>",
-		19, 0, 'robots'
-	);
-	print "<tr bgcolor=\"#$color_TableBGRowTitle\""
+		  . "\"$NewLinkTarget>$Message[9]</a>";
+
+    if ( $AddLinkToExternalCGIWrapper && ($ENV{'GATEWAY_INTERFACE'} || !$StaticLinks) ) {
+       # extend the title to include the added link
+           $title = "$title &nbsp; - &nbsp; <a href=\"" . (XMLEncode(
+               "$AddLinkToExternalCGIWrapper" . "?section=ROBOT&baseName=$DirData/$PROG"
+           . "&month=$MonthRequired&year=$YearRequired&day=$DayRequired"
+           . "&siteConfig=$SiteConfig" )
+           . "\"$NewLinkTarget>$Message[179]</a>");
+    }
+        
+    &tab_head( "$title", 19, 0, 'robots');
+        
+    print "<tr bgcolor=\"#$color_TableBGRowTitle\""
 	  . Tooltip(16) . "><th>"
 	  . Format_Number(( scalar keys %_robot_h ))
 	  . " $Message[51]*</th>";
@@ -15034,6 +15333,16 @@ sub HTMLMainPages{
 		  )
 		  . "\"$NewLinkTarget>$Message[116]</a>";
 	}
+	
+    if ( $AddLinkToExternalCGIWrapper && ($ENV{'GATEWAY_INTERFACE'} || !$StaticLinks) ) {
+       # extend the title to include the added link
+           $title .= " &nbsp; - &nbsp; <a href=\"" . (XMLEncode(
+               "$AddLinkToExternalCGIWrapper" . "?section=SIDER&baseName=$DirData/$PROG"
+           . "&month=$MonthRequired&year=$YearRequired&day=$DayRequired"
+           . "&siteConfig=$SiteConfig" )
+           . "\"$NewLinkTarget>$Message[179]</a>");
+    }
+        	
 	&tab_head( "$title", 19, 0, 'urls' );
 	print
 "<tr bgcolor=\"#$color_TableBGRowTitle\"><th>".Format_Number($TotalDifferentPages)." $Message[28]</th>";
@@ -15243,16 +15552,21 @@ sub HTMLMainOS{
 	if ($Debug) { debug( "ShowOSStats", 2 ); }
 	print "$Center<a name=\"os\">&nbsp;</a><br />\n";
 	my $Totalh   = 0;
+	my $Totalp   = 0;
 	my %new_os_h = ();
+	my %new_os_p = ();
   OSLOOP: foreach my $key ( keys %_os_h ) {
 		$Totalh += $_os_h{$key};
+		$Totalp += $_os_p{$key};
 		foreach my $family ( keys %OSFamily ) {
 			if ( $key =~ /^$family/i ) {
 				$new_os_h{"${family}cumul"} += $_os_h{$key};
+				$new_os_p{"${family}cumul"} += $_os_p{$key};
 				next OSLOOP;
 			}
 		}
 		$new_os_h{$key} += $_os_h{$key};
+		$new_os_p{$key} += $_os_p{$key};
 	}
 	my $title =
 "$Message[59] ($Message[77] $MaxNbOf{'OsShown'}) &nbsp; - &nbsp; <a href=\""
@@ -15270,10 +15584,20 @@ sub HTMLMainOS{
 		: "$StaticLinks.unknownos.$StaticExt"
 	  )
 	  . "\"$NewLinkTarget>$Message[0]</a>";
+	  
+    if ( $AddLinkToExternalCGIWrapper && ($ENV{'GATEWAY_INTERFACE'} || !$StaticLinks) ) {
+       # extend the title to include the added link
+           $title .= " &nbsp; - &nbsp; <a href=\"" . (XMLEncode(
+               "$AddLinkToExternalCGIWrapper" . "?section=OS&baseName=$DirData/$PROG"
+           . "&month=$MonthRequired&year=$YearRequired&day=$DayRequired"
+           . "&siteConfig=$SiteConfig" )
+           . "\"$NewLinkTarget>$Message[179]</a>");
+    }
+        	  
 	&tab_head( "$title", 19, 0, 'os' );
 	
 	&BuildKeyList( $MaxNbOf{'OsShown'}, $MinHit{'Os'}, \%new_os_h,
-		\%new_os_h );
+		\%new_os_p );
 		
 	# Graph the top five in a pie chart
 	if (scalar @keylist > 1){
@@ -15315,22 +15639,33 @@ sub HTMLMainOS{
 	}
 	
 	print
-"<tr bgcolor=\"#$color_TableBGRowTitle\"><th width=\"$WIDTHCOLICON\">&nbsp;</th><th>$Message[59]</th><th bgcolor=\"#$color_h\" width=\"80\">$Message[57]</th><th bgcolor=\"#$color_h\" width=\"80\">$Message[15]</th></tr>\n";
+"<tr bgcolor=\"#$color_TableBGRowTitle\"><th width=\"$WIDTHCOLICON\">&nbsp;</th><th>$Message[59]</th>";
+	print
+"<th bgcolor=\"#$color_p\" width=\"80\">$Message[56]</th><th bgcolor=\"#$color_p\" width=\"80\">$Message[15]</th>";
+	print
+"<th bgcolor=\"#$color_h\" width=\"80\">$Message[57]</th><th bgcolor=\"#$color_h\" width=\"80\">$Message[15]</th></tr>\n";
 	my $total_h = 0;
+	my $total_p = 0;
 	my $count = 0;
 	
 	foreach my $key (@keylist) {
-		my $p = '&nbsp;';
+		my $p_h = '&nbsp;';
+		my $p_p = '&nbsp;';
 		if ($Totalh) {
-			$p = int( $new_os_h{$key} / $Totalh * 1000 ) / 10;
-			$p = "$p %";
+			$p_h = int( $new_os_h{$key} / $Totalh * 1000 ) / 10;
+			$p_h = "$p_h %";
+		}
+		if ($Totalp) {
+			$p_p = int( $new_os_p{$key} / $Totalp * 1000 ) / 10;
+			$p_p = "$p_p %";
 		}
 		if ( $key eq 'Unknown' ) {
 			print "<tr><td"
 			  . ( $count ? "" : " width=\"$WIDTHCOLICON\"" )
 			  . "><img src=\"$DirIcons\/os\/unknown.png\""
 			  . AltTitle("")
-			  . " /></td><td class=\"aws\"><span style=\"color: #$color_other\">$Message[0]</span></td><td>".Format_Number($_os_h{$key})."</td><td>$p</td></tr>\n";
+			  . " /></td><td class=\"aws\"><span style=\"color: #$color_other\">$Message[0]</span></td>"
+			  . "<td>".Format_Number($_os_p{$key})."</td><td>$p_p</td><td>".Format_Number($_os_h{$key})."</td><td>$p_h</td></tr>\n";
 		}
 		else {
 			my $keywithoutcumul = $key;
@@ -15346,23 +15681,27 @@ sub HTMLMainOS{
 			  . ( $count ? "" : " width=\"$WIDTHCOLICON\"" )
 			  . "><img src=\"$DirIcons\/os\/$nameicon.png\""
 			  . AltTitle("")
-			  . " /></td><td class=\"aws\">$libos</td><td>".Format_Number($new_os_h{$key})."</td><td>$p</td></tr>\n";
+			  . " /></td><td class=\"aws\">$libos</td><td>".Format_Number($new_os_p{$key})."</td><td>$p_p</td><td>".Format_Number($new_os_h{$key})."</td><td>$p_h</td></tr>\n";
 		}
 		$total_h += $new_os_h{$key};
+		$total_p += $new_os_p{$key};
 		$count++;
 	}
 	if ($Debug) {
 		debug( "Total real / shown : $Totalh / $total_h", 2 );
 	}
 	my $rest_h = $Totalh - $total_h;
+	my $rest_p = $Totalp - $total_p;
 	if ( $rest_h > 0 ) {
-		my $p;
-		if ($Totalh) { $p = int( $rest_h / $Totalh * 1000 ) / 10; }
+		my $p_p;
+		my $p_h;
+		if ($Totalh) { $p_h = int( $rest_h / $Totalh * 1000 ) / 10; }
+		if ($Totalp) { $p_p = int( $rest_p / $Totalp * 1000 ) / 10; }
 		print "<tr>";
 		print "<td>&nbsp;</td>";
 		print
-"<td class=\"aws\"><span style=\"color: #$color_other\">$Message[2]</span></td><td>".Format_Number($rest_h)."</td>";
-		print "<td>$p %</td></tr>\n";
+"<td class=\"aws\"><span style=\"color: #$color_other\">$Message[2]</span></td><td>".Format_Number($rest_p)."</td>";
+		print "<td>$p_p %</td><td>".Format_Number($rest_h)."</td><td>$p_h %</td></tr>\n";
 	}
 	&tab_end();
 }
@@ -15381,16 +15720,21 @@ sub HTMLMainBrowsers{
 	if ($Debug) { debug( "ShowBrowsersStats", 2 ); }
 	print "$Center<a name=\"browsers\">&nbsp;</a><br />\n";
 	my $Totalh        = 0;
+	my $Totalp        = 0;
 	my %new_browser_h = ();
+	my %new_browser_p = ();
   BROWSERLOOP: foreach my $key ( keys %_browser_h ) {
 		$Totalh += $_browser_h{$key};
+		$Totalp += $_browser_p{$key};
 		foreach my $family ( keys %BrowsersFamily ) {
 			if ( $key =~ /^$family/i ) {
 				$new_browser_h{"${family}cumul"} += $_browser_h{$key};
+				$new_browser_p{"${family}cumul"} += $_browser_p{$key};
 				next BROWSERLOOP;
 			}
 		}
 		$new_browser_h{$key} += $_browser_h{$key};
+		$new_browser_p{$key} += $_browser_p{$key};
 	}
 	my $title =
 "$Message[21] ($Message[77] $MaxNbOf{'BrowsersShown'}) &nbsp; - &nbsp; <a href=\""
@@ -15408,11 +15752,22 @@ sub HTMLMainBrowsers{
 		: "$StaticLinks.unknownbrowser.$StaticExt"
 	  )
 	  . "\"$NewLinkTarget>$Message[0]</a>";
+	  
+
+    if ( $AddLinkToExternalCGIWrapper && ($ENV{'GATEWAY_INTERFACE'} || !$StaticLinks) ) {
+       # extend the title to include the added link
+           $title .= " &nbsp; - &nbsp; <a href=\"" . (XMLEncode(
+               "$AddLinkToExternalCGIWrapper" . "?section=BROWSER&baseName=$DirData/$PROG"
+           . "&month=$MonthRequired&year=$YearRequired&day=$DayRequired"
+           . "&siteConfig=$SiteConfig" )
+           . "\"$NewLinkTarget>$Message[179]</a>");
+    }
+        	  
 	&tab_head( "$title", 19, 0, 'browsers' );
 	
 	&BuildKeyList(
 		$MaxNbOf{'BrowsersShown'}, $MinHit{'Browser'},
-		\%new_browser_h,           \%new_browser_h
+		\%new_browser_h,           \%new_browser_p
 	);
 	
 	# Graph the top five in a pie chart
@@ -15454,21 +15809,29 @@ sub HTMLMainBrowsers{
 		}
 	}
 	print
-"<tr bgcolor=\"#$color_TableBGRowTitle\"><th width=\"$WIDTHCOLICON\">&nbsp;</th><th>$Message[21]</th><th width=\"80\">$Message[111]</th><th bgcolor=\"#$color_h\" width=\"80\">$Message[57]</th><th bgcolor=\"#$color_h\" width=\"80\">$Message[15]</th></tr>\n";
+"<tr bgcolor=\"#$color_TableBGRowTitle\"><th width=\"$WIDTHCOLICON\">&nbsp;</th><th>$Message[21]</th><th width=\"80\">$Message[111]</th><th bgcolor=\"#$color_p\" width=\"80\">$Message[56]</th><th bgcolor=\"#$color_p\" width=\"80\">$Message[15]</th><th bgcolor=\"#$color_h\" width=\"80\">$Message[57]</th><th bgcolor=\"#$color_h\" width=\"80\">$Message[15]</th></tr>\n";
 	my $total_h = 0;
+	my $total_p = 0;
 	my $count = 0;
 	foreach my $key (@keylist) {
-		my $p = '&nbsp;';
+		my $p_h = '&nbsp;';
+		my $p_p = '&nbsp;';
 		if ($Totalh) {
-			$p = int( $new_browser_h{$key} / $Totalh * 1000 ) / 10;
-			$p = "$p %";
+			$p_h = int( $new_browser_h{$key} / $Totalh * 1000 ) / 10;
+			$p_h = "$p_h %";
+		}
+		if ($Totalp) {
+			$p_p = int( $new_browser_p{$key} / $Totalp * 1000 ) / 10;
+			$p_p = "$p_p %";
 		}
 		if ( $key eq 'Unknown' ) {
 			print "<tr><td"
 			  . ( $count ? "" : " width=\"$WIDTHCOLICON\"" )
 			  . "><img src=\"$DirIcons\/browser\/unknown.png\""
 			  . AltTitle("")
-			  . " /></td><td class=\"aws\"><span style=\"color: #$color_other\">$Message[0]</span></td><td width=\"80\">?</td><td>".Format_Number($_browser_h{$key})."</td><td>$p</td></tr>\n";
+			  . " /></td><td class=\"aws\"><span style=\"color: #$color_other\">$Message[0]</span></td><td width=\"80\">?</td>"
+			  . "<td>".Format_Number($_browser_p{$key})."</td><td>$p_p</td>"
+			  . "<td>".Format_Number($_browser_h{$key})."</td><td>$p_h</td></tr>\n";
 		}
 		else {
 			my $keywithoutcumul = $key;
@@ -15494,25 +15857,29 @@ sub HTMLMainBrowsers{
 				? "<b>$Message[112]</b>"
 				: "$Message[113]"
 			  )
-			  . "</td><td>".Format_Number($new_browser_h{$key})."</td><td>$p</td></tr>\n";
+			  . "</td><td>".Format_Number($new_browser_p{$key})."</td><td>$p_p</td><td>".Format_Number($new_browser_h{$key})."</td><td>$p_h</td></tr>\n";
 		}
 		$total_h += $new_browser_h{$key};
+		$total_p += $new_browser_p{$key};
 		$count++;
 	}
 	if ($Debug) {
 		debug( "Total real / shown : $Totalh / $total_h", 2 );
 	}
 	my $rest_h = $Totalh - $total_h;
+	my $rest_p = $Totalp - $total_p;
 	if ( $rest_h > 0 ) {
-		my $p;
-		if ($Totalh) { $p = int( $rest_h / $Totalh * 1000 ) / 10; }
+		my $p_p = 0.0;
+		my $p_h;
+		if ($Totalh) { $p_h = int( $rest_h / $Totalh * 1000 ) / 10; }
+		if ($Totalp) { $p_p = int( $rest_p / $Totalp * 1000 ) / 10; }
 		print "<tr>";
 		print "<td>&nbsp;</td>";
 		print
-"<td class=\"aws\"><span style=\"color: #$color_other\">$Message[2]</span></td><td>&nbsp;</td><td>$rest_h</td>";
-			print "<td>$p %</td></tr>\n";
-		}
-		&tab_end();
+"<td class=\"aws\"><span style=\"color: #$color_other\">$Message[2]</span></td><td>&nbsp;</td><td>$rest_p</td>";
+		print "<td>$p_p %</td><td>$rest_h</td><td>$p_h %</td></tr>\n";
+	}
+	&tab_end();
 }
 
 #------------------------------------------------------------------------------
@@ -15597,7 +15964,19 @@ sub HTMLMainReferrers{
 		  ? $_from_h[$_]
 		  : 0;
 	}
-	&tab_head( $Message[36], 19, 0, 'referer' );
+
+    my $title = "$Message[36]";
+
+    if ( $AddLinkToExternalCGIWrapper && ($ENV{'GATEWAY_INTERFACE'} || !$StaticLinks) ) {
+       # extend the title to include the added link
+           $title .= " &nbsp; - &nbsp; <a href=\"" . (XMLEncode(
+               "$AddLinkToExternalCGIWrapper" . "?section=ORIGIN&baseName=$DirData/$PROG"
+           . "&month=$MonthRequired&year=$YearRequired&day=$DayRequired"
+           . "&siteConfig=$SiteConfig" )
+           . "\"$NewLinkTarget>$Message[179]</a>");
+    }
+        
+	&tab_head( $title, 19, 0, 'referer' );
 	my @p_p = ( 0, 0, 0, 0, 0, 0 );
 	if ( $Totalp > 0 ) {
 		$p_p[0] = int( $_from_p[0] / $Totalp * 1000 ) / 10;
@@ -16081,6 +16460,16 @@ sub HTMLMainHTTPStatus{
 	if ($Debug) { debug( "ShowHTTPErrorsStats", 2 ); }
 	print "$Center<a name=\"errors\">&nbsp;</a><br />\n";
 	my $title = "$Message[32]";
+	
+    if ( $AddLinkToExternalCGIWrapper && ($ENV{'GATEWAY_INTERFACE'} || !$StaticLinks) ) {
+       # extend the title to include the added link
+           $title .= " &nbsp; - &nbsp; <a href=\"" . (XMLEncode(
+               "$AddLinkToExternalCGIWrapper" . "?section=ERRORS&baseName=$DirData/$PROG"
+           . "&month=$MonthRequired&year=$YearRequired&day=$DayRequired"
+           . "&siteConfig=$SiteConfig" )
+           . "\"$NewLinkTarget>$Message[179]</a>");
+    }
+        	
 	&tab_head( "$title", 19, 0, 'errors' );
 	
 	&BuildKeyList( $MaxRowsInHTMLOutput, 1, \%_errors_h, \%_errors_h );
@@ -16193,6 +16582,16 @@ sub HTMLMainCluster{
 	if ($Debug) { debug( "ShowClusterStats", 2 ); }
 	print "$Center<a name=\"clusters\">&nbsp;</a><br />\n";
 	my $title = "$Message[155]";
+	
+    if ( $AddLinkToExternalCGIWrapper && ($ENV{'GATEWAY_INTERFACE'} || !$StaticLinks) ) {
+       # extend the title to include the added link
+           $title .= " &nbsp; - &nbsp; <a href=\"" . (XMLEncode(
+               "$AddLinkToExternalCGIWrapper" . "?section=CLUSTER&baseName=$DirData/$PROG"
+           . "&month=$MonthRequired&year=$YearRequired&day=$DayRequired"
+           . "&siteConfig=$SiteConfig" )
+           . "\"$NewLinkTarget>$Message[179]</a>");
+    }
+        	
 	&tab_head( "$title", 19, 0, 'clusters' );
 	
 	&BuildKeyList( $MaxRowsInHTMLOutput, 1, \%_cluster_p, \%_cluster_p );
@@ -16302,6 +16701,16 @@ sub HTMLMainExtra{
 		: "$StaticLinks.allextra$extranum.$StaticExt"
 	  )
 	  . "\"$NewLinkTarget>$Message[80]</a>";
+	  
+    if ( $AddLinkToExternalCGIWrapper && ($ENV{'GATEWAY_INTERFACE'} || !$StaticLinks) ) {
+        print "&nbsp; - &nbsp; <a href=\""
+          . (XMLEncode(
+               "$AddLinkToExternalCGIWrapper" . "?section=EXTRA_$extranum&baseName=$DirData/$PROG"
+            . "&month=$MonthRequired&year=$YearRequired&day=$DayRequired"
+            . "&sectionTitle=$ExtraName[$extranum]&siteConfig=$SiteConfig" )
+            . "\"$NewLinkTarget>$Message[179]</a>");
+    }
+  
 	print "</th>";
 
 	if ( $ExtraStatTypes[$extranum] =~ m/P/i ) {
@@ -16821,6 +17230,11 @@ if ( $ENV{'AWSTATS_FORCE_CONFIG'} ) {
 	$SiteConfig = &Sanitize( $ENV{'AWSTATS_FORCE_CONFIG'} );
 }
 
+# Display version information
+if ( $QueryString =~ /(^|&|&amp;)version/i ) {
+	print "$PROG $VERSION\n";
+	exit 0;
+}
 # Display help information
 if ( ( !$ENV{'GATEWAY_INTERFACE'} ) && ( !$SiteConfig ) ) {
 	&PrintCLIHelp();
@@ -17258,8 +17672,7 @@ if ( $QueryString =~ /lastline=(\d{14})/i ) {
 	$LastLine = $1;
 }
 if ($Debug) {
-	debug(
-		"Last year=$lastyearbeforeupdate - Last month=$lastmonthbeforeupdate");
+	debug("Last year=$lastyearbeforeupdate - Last month=$lastmonthbeforeupdate");
 	debug("Last day=$lastdaybeforeupdate - Last hour=$lasthourbeforeupdate");
 	debug("LastLine=$LastLine");
 	debug("LastLineNumber=$LastLineNumber");
@@ -17465,9 +17878,14 @@ if ( $UpdateStats && $FrameName ne 'index' && $FrameName ne 'mainleft' )
 	my $regipv4l          = qr/^::ffff:\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/;
 	my $regipv6           = qr/^[0-9A-F]*:/i;
 	my $regvermsie        = qr/msie([+_ ]|)([\d\.]*)/i;
+	my $regvermsie11      = qr/trident\/7\.\d*\;([+_ ]|)rv:([\d\.]*)/i;
 	my $regvernetscape    = qr/netscape.?\/([\d\.]*)/i;
 	my $regverfirefox     = qr/firefox\/([\d\.]*)/i;
-	my $regveropera       = qr/opera\/([\d\.]*)/i;
+	# For Opera:
+	# OPR/15.0.1266 means Opera 15 
+	# Opera/9.80 ...... Version/12.16 means Opera 12.16
+	# Mozilla/5.0 .... Opera 11.51 means Opera 11.51
+	my $regveropera = qr/opera\/9\.80\s.+\sversion\/([\d\.]+)|ope?ra?[\/\s]([\d\.]+)/i;
 	my $regversafari      = qr/safari\/([\d\.]*)/i;
 	my $regversafariver   = qr/version\/([\d\.]*)/i;
 	my $regverchrome      = qr/chrome\/([\d\.]*)/i;
@@ -17813,12 +18231,13 @@ if ( $UpdateStats && $FrameName ne 'index' && $FrameName ne 'mainleft' )
 		}
 
 		$field[$pos_date] =~
-		  tr/,-\/ \t/:::::/s;  # " \t" is used instead of "\s" not known with tr
+		  tr/,-\/ \tT/::::::/s;  # " \t" is used instead of "\s" not known with tr
 		my @dateparts =
-		  split( /:/, $field[$pos_date] )
-		  ; # tr and split faster than @dateparts=split(/[\/\-:\s]/,$field[$pos_date])
-		 # Detected date format: dddddddddd, YYYY-MM-DD HH:MM:SS (IIS), MM/DD/YY\tHH:MM:SS,
-		 # DD/Month/YYYY:HH:MM:SS (Apache), DD/MM/YYYY HH:MM:SS, Mon DD HH:MM:SS
+		  split( /:/, $field[$pos_date] ); # tr and split faster than @dateparts=split(/[\/\-:\s]/,$field[$pos_date])
+		 # Detected date format: 
+		 # dddddddddd, YYYY-MM-DD HH:MM:SS (IIS), MM/DD/YY\tHH:MM:SS,
+		 # DD/Month/YYYY:HH:MM:SS (Apache), DD/MM/YYYY HH:MM:SS, Mon DD HH:MM:SS,
+		 # YYYY-MM-DDTHH:MM:SS (iso)
 		if ( !$dateparts[1] ) {    # Unix timestamp
 			(
 				$dateparts[5], $dateparts[4], $dateparts[3],
@@ -17989,6 +18408,12 @@ if ( $UpdateStats && $FrameName ne 'index' && $FrameName ne 'mainleft' )
 			debug( "  This is a not already processed record ($timerecord)",
 				4 );
 		}
+
+		# Check if there's a CloudFlare Visitor IP in the query string
+		# If it does, replace the ip
+		if ( $pos_query >= 0 && $field[$pos_query] && $field[$pos_query] =~ /\[CloudFlare_Visitor_IP[:](\d+[.]\d+[.]\d+[.]\d+)\]/ ) {
+			$field[$pos_host] = "$1";
+		}	
 
 		# We found a new line
 		#----------------------------------------
@@ -18335,7 +18760,8 @@ if ( $UpdateStats && $FrameName ne 'index' && $FrameName ne 'mainleft' )
 				if ( $ValidHTTPCodes{ $field[$pos_code] } ) {    # Code is valid
 					if ( int($field[$pos_code]) == 304 && $pos_size>0) { $field[$pos_size] = 0; }
 					# track downloads
-					if (int($field[$pos_code]) == 200 && $MimeHashLib{$extension}[1] eq 'd'){
+					if (int($field[$pos_code]) == 200 && $MimeHashLib{$extension}[1] eq 'd' && $urlwithnoquery !~ /robots.txt$/ )  # We track download if $MimeHashLib{$extension}[1] = 'd'
+					{
 						$_downloads{$urlwithnoquery}->{'AWSTATS_HITS'}++;
 						$_downloads{$urlwithnoquery}->{'AWSTATS_SIZE'} += ($pos_size>0 ? int($field[$pos_size]) : 0);
 						if ($Debug) { debug( " New download detected: '$urlwithnoquery'", 2 ); }
@@ -19004,23 +19430,26 @@ if ( $UpdateStats && $FrameName ne 'index' && $FrameName ne 'mainleft' )
 					if ( !$uabrowser ) {
 						my $found = 1;
 
-						# Firefox ?
-						if (   $UserAgent =~ /$regverfirefox/o
-							&& $UserAgent !~ /$regnotfirefox/o )
-						{
-							$_browser_h{"firefox$1"}++;
-							$TmpBrowser{$UserAgent} = "firefox$1";
-						}
-
 						# Opera ?
-						elsif ( $UserAgent =~ /$regveropera/o ) {
-							$_browser_h{"opera$1"}++;
-							$TmpBrowser{$UserAgent} = "opera$1";
+						if ( $UserAgent =~ /$regveropera/o ) {	# !!!! version number in in regex $1 or $2 !!!
+						    $_browser_h{"opera".($1||$2)}++;
+						    if ($PageBool) { $_browser_p{"opera".($1||$2)}++; }
+						    $TmpBrowser{$UserAgent} = "opera".($1||$2);
+						}
+						
+						# Firefox ?
+						elsif ( $UserAgent =~ /$regverfirefox/o
+						    && $UserAgent !~ /$regnotfirefox/o )
+						{
+						    $_browser_h{"firefox$1"}++;
+						    if ($PageBool) { $_browser_p{"firefox$1"}++; }
+						    $TmpBrowser{$UserAgent} = "firefox$1";
 						}
 
 						# Chrome ?
 						elsif ( $UserAgent =~ /$regverchrome/o ) {
 							$_browser_h{"chrome$1"}++;
+							if ($PageBool) { $_browser_p{"chrome$1"}++; }
 							$TmpBrowser{$UserAgent} = "chrome$1";
 						}
 
@@ -19033,32 +19462,45 @@ if ( $UpdateStats && $FrameName ne 'index' && $FrameName ne 'mainleft' )
 								$safariver = $1;
 							}
 							$_browser_h{"safari$safariver"}++;
+							if ($PageBool) { $_browser_p{"safari$safariver"}++; }
 							$TmpBrowser{$UserAgent} = "safari$safariver";
 						}
 
 						# Konqueror ?
 						elsif ( $UserAgent =~ /$regverkonqueror/o ) {
 							$_browser_h{"konqueror$1"}++;
+							if ($PageBool) { $_browser_p{"konqueror$1"}++; }
 							$TmpBrowser{$UserAgent} = "konqueror$1";
 						}
 
 						# Subversion ?
 						elsif ( $UserAgent =~ /$regversvn/o ) {
 							$_browser_h{"svn$1"}++;
+							if ($PageBool) { $_browser_p{"svn$1"}++; }
 							$TmpBrowser{$UserAgent} = "svn$1";
 						}
 
-						# IE ? (must be at end of test)
+						# IE < 11 ? (must be at end of test)
 						elsif ($UserAgent =~ /$regvermsie/o
 							&& $UserAgent !~ /$regnotie/o )
 						{
 							$_browser_h{"msie$2"}++;
+							if ($PageBool) { $_browser_p{"msie$2"}++; }
 							$TmpBrowser{$UserAgent} = "msie$2";
+						}
+						
+						# IE >= 11
+                        elsif ($UserAgent =~ /$regvermsie11/o && $UserAgent !~ /$regnotie/o)
+						{
+                            $_browser_h{"msie$2"}++;
+                            if ($PageBool) { $_browser_p{"msie$2"}++; }
+                            $TmpBrowser{$UserAgent} = "msie$2";
 						}
 
 						# Netscape 6.x, 7.x ... ? (must be at end of test)
 						elsif ( $UserAgent =~ /$regvernetscape/o ) {
 							$_browser_h{"netscape$1"}++;
+							if ($PageBool) { $_browser_p{"netscape$1"}++; }
 							$TmpBrowser{$UserAgent} = "netscape$1";
 						}
 
@@ -19067,6 +19509,7 @@ if ( $UpdateStats && $FrameName ne 'index' && $FrameName ne 'mainleft' )
 							&& $UserAgent !~ /$regnotnetscape/o )
 						{
 							$_browser_h{"netscape$2"}++;
+							if ($PageBool) { $_browser_p{"netscape$2"}++; }
 							$TmpBrowser{$UserAgent} = "netscape$2";
 						}
 
@@ -19080,6 +19523,7 @@ if ( $UpdateStats && $FrameName ne 'index' && $FrameName ne 'mainleft' )
 
 								   # TODO If browser is in a family, use version
 									$_browser_h{"$browser"}++;
+									if ($PageBool) { $_browser_p{"$browser"}++; }
 									$TmpBrowser{$UserAgent} = "$browser";
 									$found = 1;
 									last;
@@ -19090,6 +19534,7 @@ if ( $UpdateStats && $FrameName ne 'index' && $FrameName ne 'mainleft' )
 						# Unknown browser ?
 						if ( !$found ) {
 							$_browser_h{'Unknown'}++;
+							if ($PageBool) { $_browser_p{'Unknown'}++; }
 							$TmpBrowser{$UserAgent} = 'Unknown';
 							my $newua = $UserAgent;
 							$newua =~ tr/\+ /__/;
@@ -19098,6 +19543,7 @@ if ( $UpdateStats && $FrameName ne 'index' && $FrameName ne 'mainleft' )
 					}
 					else {
 						$_browser_h{$uabrowser}++;
+						if ($PageBool) { $_browser_p{$uabrowser}++; }
 						if ( $uabrowser eq 'Unknown' ) {
 							my $newua = $UserAgent;
 							$newua =~ tr/\+ /__/;
@@ -19121,6 +19567,7 @@ if ( $UpdateStats && $FrameName ne 'index' && $FrameName ne 'mainleft' )
 							if ( $UserAgent =~ /$_/ ) {
 								my $osid = $OSHashID{ &UnCompileRegex($_) };
 								$_os_h{"$osid"}++;
+								if ($PageBool) { $_os_p{"$osid"}++; }
 								$TmpOS{$UserAgent} = "$osid";
 								$found = 1;
 								last;
@@ -19130,6 +19577,7 @@ if ( $UpdateStats && $FrameName ne 'index' && $FrameName ne 'mainleft' )
 						# Unknown OS ?
 						if ( !$found ) {
 							$_os_h{'Unknown'}++;
+							if ($PageBool) { $_os_p{'Unknown'}++; }
 							$TmpOS{$UserAgent} = 'Unknown';
 							my $newua = $UserAgent;
 							$newua =~ tr/\+ /__/;
@@ -19138,6 +19586,9 @@ if ( $UpdateStats && $FrameName ne 'index' && $FrameName ne 'mainleft' )
 					}
 					else {
 						$_os_h{$uaos}++;
+						if ($PageBool) {
+							$_os_p{$uaos}++;
+						}
 						if ( $uaos eq 'Unknown' ) {
 							my $newua = $UserAgent;
 							$newua =~ tr/\+ /__/;
@@ -19151,6 +19602,10 @@ if ( $UpdateStats && $FrameName ne 'index' && $FrameName ne 'mainleft' )
 			else {
 				$_browser_h{'Unknown'}++;
 				$_os_h{'Unknown'}++;
+				if ($PageBool) {
+					$_browser_p{'Unknown'}++;
+					$_os_p{'Unknown'}++;
+				}
 			}
 
 			# Analyze: Referer
@@ -20399,10 +20854,10 @@ if ( scalar keys %HTMLOutput ) {
 			&HTMLShowURLDetail();
 		}
 		if ( $HTMLOutput{'unknownos'} ) {
-			&HTMLShowOSUnknown();
+			&HTMLShowOSUnknown($NewLinkTarget);
 		}
 		if ( $HTMLOutput{'unknownbrowser'} ) {
-			&HTMLShowBrowserUnknown();
+			&HTMLShowBrowserUnknown($NewLinkTarget);
 		}
 		if ( $HTMLOutput{'osdetail'} ) {
 			&HTMLShowOSDetail();
@@ -20411,16 +20866,16 @@ if ( scalar keys %HTMLOutput ) {
 			&HTMLShowBrowserDetail();
 		}
 		if ( $HTMLOutput{'refererse'} ) {
-			&HTMLShowReferers();
+			&HTMLShowReferers($NewLinkTarget);
 		}
 		if ( $HTMLOutput{'refererpages'} ) {
-			&HTMLShowRefererPages();
+			&HTMLShowRefererPages($NewLinkTarget);
 		}
 		if ( $HTMLOutput{'keyphrases'} ) {
-			&HTMLShowKeyPhrases();
+			&HTMLShowKeyPhrases($NewLinkTarget);
 		}
 		if ( $HTMLOutput{'keywords'} ) {
-			&HTMLShowKeywords();
+			&HTMLShowKeywords($NewLinkTarget);
 		}
 		if ( $HTMLOutput{'downloads'} ) {
 			&HTMLShowDownloads();
@@ -20520,13 +20975,13 @@ if ( scalar keys %HTMLOutput ) {
 		# BY DAY OF WEEK
 		#-------------------------
 		if ($ShowDaysOfWeekStats) {
-			&HTMLMainDaysofWeek($firstdaytocountaverage, $lastdaytocountaverage);
+			&HTMLMainDaysofWeek($firstdaytocountaverage, $lastdaytocountaverage, $NewLinkParams, $NewLinkTarget);
 		}
 
 		# BY HOUR
 		#----------------------------
 		if ($ShowHoursStats) {
-			&HTMLMainHours();
+			&HTMLMainHours($NewLinkParams, $NewLinkTarget);
 		}
 
 		print "\n<a name=\"who\">&nbsp;</a>\n\n";
@@ -20584,7 +21039,7 @@ if ( scalar keys %HTMLOutput ) {
 		# BY FILE TYPE
 		#-------------------------
 		if ($ShowFileTypesStats) {
-			&HTMLMainFileType();
+			&HTMLMainFileType($NewLinkParams, $NewLinkTarget);
 		}
 
 		# BY FILE SIZE

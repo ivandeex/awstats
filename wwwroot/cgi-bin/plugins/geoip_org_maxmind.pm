@@ -6,7 +6,6 @@
 #-----------------------------------------------------------------------------
 # Perl Required Modules: Geo::IP or Geo::IP::PurePerl
 #-----------------------------------------------------------------------------
-# $Revision: 1.18 $ - $Author: eldy $ - $Date: 2010/08/23 21:55:34 $
 
 
 # <-----
@@ -64,7 +63,7 @@ sub Init_geoip_org_maxmind {
 	my $InitParams=shift;
 	my $checkversion=&Check_Plugin_Version($PluginNeedAWStatsVersion);
     $MAXNBOFSECTIONGIR=10;
-    $MAXLENGTH=20;
+    $MAXLENGTH=50;
     
 	# <-----
 	# ENTER HERE CODE TO DO INIT PLUGIN ACTIONS
@@ -91,8 +90,10 @@ sub Init_geoip_org_maxmind {
 		$geoip_org_maxmind = Geo::IP->open($datafile, $mode);
 	}
 	$LoadedOverride=0;
-# Fails on some GeoIP version
-# 	debug(" Plugin geoip_org_maxmind: GeoIP initialized database_info=".$geoip_org_maxmind->database_info());
+	# Fails on some GeoIP version
+	# debug(" Plugin $PluginName: GeoIP initialized database_info=".$geoip_org_maxmind->database_info());
+	if ($geoip_org_maxmind) { debug(" Plugin $PluginName: GeoIP plugin and gi object initialized",1); }
+	else { return "Error: Failed to create gi object for datafile=".$datafile; }
 	# ----->
 
 	return ($checkversion?$checkversion:"$PluginHooksFunctions");

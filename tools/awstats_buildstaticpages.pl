@@ -3,7 +3,6 @@
 # Launch awstats with -staticlinks option to build all static pages.
 # See COPYING.TXT file about AWStats GNU General Public License.
 #------------------------------------------------------------------------------
-# $Revision: 1.40 $ - $Author: eldy $ - $Date: 2010/08/04 12:56:50 $
 
 #$|=1;
 #use warnings;		# Must be used in test mode only. This reduce a little process speed
@@ -15,7 +14,7 @@ use Time::Local;	# use Time::Local 'timelocal_nocheck' is faster but not support
 #------------------------------------------------------------------------------
 # Defines
 #------------------------------------------------------------------------------
-my $REVISION='$Revision: 1.40 $'; $REVISION =~ /\s(.*)\s/; $REVISION=$1;
+my $REVISION='20140126';
 my $VERSION="1.2 (build $REVISION)";
 
 # ---------- Init variables --------
@@ -51,7 +50,7 @@ $ShowEMailSenders $ShowEMailReceivers $ShowWormsStats $ShowClusterStats
 $ShowMenu $ShowMonthStats $ShowDaysOfMonthStats $ShowDaysOfWeekStats
 $ShowHoursStats $ShowDomainsStats $ShowHostsStats
 $ShowRobotsStats $ShowSessionsStats $ShowPagesStats $ShowFileTypesStats
-$ShowOSStats $ShowBrowsersStats $ShowOriginStats
+$ShowOSStats $ShowBrowsersStats $ShowDownloadsStats $ShowOriginStats
 $ShowKeyphrasesStats $ShowKeywordsStats $ShowMiscStats $ShowHTTPErrorsStats
 $BuildReportFormat
 @ExtraName
@@ -234,6 +233,7 @@ sub Parse_Config {
 		if ( $param =~ /^LoadPlugin/ ) { push @PluginsToLoad, $value; next; }
 
 		# If parameters was not found previously, defined variable with name of param to value
+		print $param."-".$value."\n";
 		$$param=$value;
 	}
 
@@ -297,7 +297,7 @@ if (! $SiteConfig) {
 	print "                                 Output directory must contains icon directory\n";
 	print "                                 when this option is used (need 'htmldoc')\n";
 	print "\n";
-	print "New versions and FAQ at http://awstats.sourceforge.net\n";
+	print "New versions and FAQ at http://www.awstats.org\n";
 	exit 0;
 }
 
@@ -354,6 +354,7 @@ if ($ShowPagesStats) { push @OutputList,'urldetail'; push @OutputList,'urlentry'
 #if ($ShowFileTypesStats) { push @OutputList,'filetypes'; }	# There is dedicated page for filetypes
 if ($ShowOSStats) { push @OutputList,'osdetail'; push @OutputList,'unknownos'; }
 if ($ShowBrowsersStats) { push @OutputList,'browserdetail'; push @OutputList,'unknownbrowser'; }
+if ($ShowDownloadsStats) { push @OutputList,'downloads'; }
 if ($ShowScreenSizeStats) { push @OutputList,'screensize'; }
 if ($ShowOriginStats) { push @OutputList,'refererse'; push @OutputList,'refererpages'; }
 if ($ShowKeyphrasesStats) { push @OutputList,'keyphrases'; }
@@ -423,7 +424,7 @@ if ($BuildDate) {
 my $cpt=0;
 my $NoLoadPlugin="";
 if ($BuildPDF) { $NoLoadPlugin.="tooltips,rawlog,hostinfo"; }
-my $smallcommand="\"$Awstats\" -config=$SiteConfig".($BuildPDF?" -buildpdf":"").($NoLoadPlugin?" -noloadplugin=$NoLoadPlugin":"")." -staticlinks".($OutputSuffix ne $SiteConfig?"=$OutputSuffix":"");
+my $smallcommand="\"$Awstats\" -config=$SiteConfig".($BuildPDF?" -buildpdf":"").($NoLoadPlugin?" -noloadplugin=$NoLoadPlugin":"").($DatabaseBreak?" -databasebreak=$DatabaseBreak":"")." -staticlinks".($OutputSuffix ne $SiteConfig?"=awstats.$OutputSuffix":"");
 if ($StaticExt && $StaticExt ne 'html')     { $smallcommand.=" -staticlinksext=$StaticExt"; }
 if ($DirIcons)      { $smallcommand.=" -diricons=$DirIcons"; }
 if ($DirConfig)     { $smallcommand.=" -configdir=$DirConfig"; }

@@ -4,6 +4,19 @@
 # and return to browser a redirector to tell browser to visit this URL.
 # Ex: <a href="http://athena/cgi-bin/awredir/awredir.pl?tag=TAGFORLOG&key=ABCDEFGH&url=http://212.43.217.240/%7Eforumgp/forum/list.php3?f=11">XXX</a>
 # Where ABCDEFGH is md5(YOURKEYFORMD5.url)
+#
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 2 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
 #-------------------------------------------------------
 
 #use DBD::mysql;
@@ -14,7 +27,7 @@ use Digest::MD5 qw(md5 md5_hex md5_base64);
 # Defines
 #-------------------------------------------------------
 use vars qw/ $REVISION $VERSION /;
-$REVISION='$Revision: 1.12 $'; $REVISION =~ /\s(.*)\s/; $REVISION=$1;
+$REVISION='20140126';
 $VERSION="1.2 (build $REVISION)";
 
 use vars qw / $DIR $PROG $Extension $DEBUG $DEBUGFILE $REPLOG $DEBUGRESET $SITE $REPCONF /;
@@ -34,6 +47,9 @@ $EXCLUDEIP="127.0.0.1";
 # site you can set this to empty string, but warning this is a security hole as everybody
 # can use awredir on your site to redirect to any web site (even non legal web sites). 
 $KEYFORMD5='YOURKEYFORMD5';
+# Put here url pattern you want to allow event if parameter key is not provided.
+$AUTHORIZEDWITHOUTKEY='';
+
 
 #-------------------------------------------------------
 # Functions
@@ -73,6 +89,27 @@ sub DecodeEncodedString {
 	return $stringtodecode;
 }
 
+#------------------------------------------------------------------------------
+# Function:     Clean a string of HTML tags to avoid 'Cross Site Scripting attacks'
+#               and clean | char.
+# Parameters:   stringtoclean
+# Input:        None
+# Output:       None
+# Return:		cleanedstring
+#------------------------------------------------------------------------------
+sub CleanXSS {
+	my $stringtoclean = shift;
+
+	# To avoid html tags and javascript
+	$stringtoclean =~ s/</&lt;/g;
+	$stringtoclean =~ s/>/&gt;/g;
+	$stringtoclean =~ s/|//g;
+
+	# To avoid onload="
+	$stringtoclean =~ s/onload//g;
+	return $stringtoclean;
+}
+
 
 #-------------------------------------------------------
 # MAIN
@@ -106,7 +143,7 @@ if (! $ENV{'GATEWAY_INTERFACE'}) {	# Run from command line
 	exit 0;
 }
 
-if ($KEYFORMD5 eq 'YOURKEYFORMD5') {
+if ((! $AUTHORIZEDWITHOUTKEY) && ($KEYFORMD5 eq 'YOURKEYFORMD5')) {
         error("Error: You must change value of constant KEYFORMD5 in awredir.pl script.");
 }
 
@@ -124,6 +161,12 @@ elsif ($Url =~ /url=(.+)$/) { $Url=$1; }
 $Url = DecodeEncodedString($Url);
 $UrlParam=$Url;
 
+# Sanitize parameters
+$Tag=CleanXSS($Tag);
+$Key=CleanXSS($Key);
+$UrlParam=CleanXSS($UrlParam);
+
+
 if (! $UrlParam) {
         error("Error: Bad use of $PROG. To redirect an URL with $PROG, use the following syntax:<br><i>/cgi-bin/$PROG.pl?url=http://urltogo</i>");
 }
@@ -131,11 +174,10 @@ if (! $UrlParam) {
 if ($Url !~ /^http/i) { $Url = "http://".$Url; }
 if ($DEBUG) { print LOGFILE "Url=$Url\n"; }
 
-if ($KEYFORMD5 && ($Key ne md5_hex($KEYFORMD5.$UrlParam))) {
+if ((! $AUTHORIZEDWITHOUTKEY || $UrlParam !~ /$AUTHORIZEDWITHOUTKEY/) && $KEYFORMD5 && ($Key ne md5_hex($KEYFORMD5.$UrlParam))) {
 #       error("Error: Bad value for parameter key=".$Key." to allow a redirect to ".$UrlParam." - ".$KEYFORMD5." - ".md5_hex($KEYFORMD5.$UrlParam) );
         error("Error: Bad value for parameter key=".$Key." to allow a redirect to ".$UrlParam.". Key must be hexadecimal md5(KEYFORMD5.".$UrlParam.") where KEYFORMD5 is value hardcoded into awredir.pl. Note: You can remove use of key by setting KEYFORMD5 to empty string in script awredir.pl");
 }
-
 
 # Get date
 ($nowsec,$nowmin,$nowhour,$nowday,$nowmonth,$nowyear,$nowwday,$nowyday,$nowisdst) = localtime(time);
