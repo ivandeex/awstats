@@ -5,7 +5,6 @@
 #-----------------------------------------------------------------------------
 # Perl Required Modules: None
 #-----------------------------------------------------------------------------
-# $Revision: 1.5 $ - $Author: eldy $ - $Date: 2010/06/22 21:35:24 $
 # 
 # Changelog
 #
@@ -29,8 +28,8 @@ no strict "refs";
 my $PluginNeedAWStatsVersion = "7.0";
 my $PluginHooksFunctions = "Init ShowGraph AddHTMLHeader";
 my $PluginName = "graphgooglechartapi";
-my $ChartProtocol = "http://";
-my $ChartURI = "chart.apis.google.com/chart?";	# Don't put the HTTP part here!
+my $ChartProtocol = "https://";
+my $ChartURI = "chart.googleapis.com/chart?";	# Don't put the HTTP part here!
 my $ChartIndex = 0;
 my $title;
 my $type;
@@ -169,7 +168,7 @@ sub ShowGraph_graphgooglechartapi() {
 # Return:		0 OK, 1 Error
 #-------------------------------------------------------
 sub AddHTMLHeader_graphgooglechartapi(){
-	print "<script type='text/javascript' src='http://www.google.com/jsapi'></script>\n";
+	print "<script type='text/javascript' src='https://www.google.com/jsapi'></script>\n";
 }
 
 #-------------------------------------------------------
@@ -484,9 +483,12 @@ sub Chart_Map(){
 	# loop and dump
     my $i = 0;
     for ($i .. (scalar @$blocklabel - 1)) {
+	# VANKO: fix uk and russia
     	my $country_name = @$blocklabel[$i];
     	$country_name = "Russia" if $country_name eq "Russian Federation";
+        $country_name = "United Kingdom" if $country_name eq "Great Britain";
     	print "\tdata.setValue($i, 0, \"".$country_name."\");\n";
+        # /VANKO
     	print "\tdata.setValue($i, 1, ".@$valdata[$i].");\n";
     	$i++;
     	# Google's Geomap only supports up to 400 entries

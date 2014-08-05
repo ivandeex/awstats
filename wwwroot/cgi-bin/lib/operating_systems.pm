@@ -3,7 +3,6 @@
 # If you want to add an OS to extend AWStats database detection capabilities,
 # you must add an entry in OSSearchIDOrder, in OSHashID and in OSHashLib.
 #-------------------------------------------------------
-# $Revision: 1.31 $ - $Author: eldy $ - $Date: 2010/08/04 10:55:08 $
 
 # 2005-08-19 Sean Carlos http://www.antezeta.com/awstats.html
 #              - added specific Linux distributions in addition to 
@@ -11,12 +10,15 @@
 #              Included documentation link to Distribution home pages.
 #              - added links for each operating systems.
 
+# 2013-01-08 Joe CC Ho - added iOS, Windows 8 and Windows Phone.
+
 #package AWSOS;
 
 # Relocated from main file for easier editing
 %OSFamily = (
 	'win'   => 'Windows',
 	'mac'   => 'Macintosh',
+	'ios'   => 'iOS',
 	'linux' => 'Linux',
 	'bsd'   => 'BSD'
 );
@@ -31,17 +33,33 @@
 # Windows OS family
 'windows[_+ ]?2005', 'windows[_+ ]nt[_+ ]6\.0',
 'windows[_+ ]?2008', 'windows[_+ ]nt[_+ ]6\.1', # Must be before windows_nt_6
+'windows[_+ ]?2012', 'windows[_+ ]nt[_+ ]6\.2', # Must be before windows_nt_6 = windows 8
+'windows[_+ ]nt[_+ ]6\.3', # Must be before windows_nt_6 = windows 8.1 
 'windows[_+ ]?vista', 'windows[_+ ]nt[_+ ]6',
 'windows[_+ ]?2003','windows[_+ ]nt[_+ ]5\.2',	# Must be before windows_nt_5
 'windows[_+ ]xp','windows[_+ ]nt[_+ ]5\.1',		# Must be before windows_nt_5
 'windows[_+ ]me','win[_+ ]9x',					# Must be before windows_98
 'windows[_+ ]?2000','windows[_+ ]nt[_+ ]5',
+'windows[_+ ]phone',
 'winnt','windows[_+ \-]?nt','win32',
 'win(.*)98',
 'win(.*)95',
 'win(.*)16','windows[_+ ]3',					# This works for windows_31 and windows_3.1
 'win(.*)ce',
+# iOS family
+#'iphone[_+ ]os',  #Must be Before Mac OS Family
+#'ipad[_+ ]os',  #Must be Before Mac OS Family
+#'ipod[_+ ]os',  #Must be Before Mac OS Family
+'iphone',
+'ipad',
+'ipod',
 # Macintosh OS family
+'mac[_+ ]os[_+ ]x[_+ ]10[_\.]9',
+'mac[_+ ]os[_+ ]x[_+ ]10[_\.]8',
+'mac[_+ ]os[_+ ]x[_+ ]10[_\.]7',
+'mac[_+ ]os[_+ ]x[_+ ]10[_\.]6',
+'mac[_+ ]os[_+ ]x[_+ ]10[_\.]5',
+'mac[_+ ]os[_+ ]x[_+ ]10[_\.]4',
 'mac[_+ ]os[_+ ]x',
 'mac[_+ ]?p',									# This works for macppc and mac_ppc and mac_powerpc
 'mac[_+ ]68',									# This works for mac_6800 and mac_68k
@@ -99,7 +117,6 @@
 'cp/m',
 'crayos',
 'dreamcast',
-'iphone[_+ ]os',
 'risc[_+ ]?os',
 'symbian',
 'webtv',
@@ -129,12 +146,15 @@
 # Windows OS family
 'windows[_+ ]?2005','winlong','windows[_+ ]nt[_+ ]6\.0','winlong',
 'windows[_+ ]?2008','win2008','windows[_+ ]nt[_+ ]6\.1','win7',
+'windows[_+ ]?2012','win2012','windows[_+ ]nt[_+ ]6\.2','win8',
+'windows[_+ ]nt[_+ ]6\.3','win8.1',
 'windows[_+ ]?vista','winvista','windows[_+ ]nt[_+ ]6','winvista',
 'windows[_+ ]?2003','win2003','windows[_+ ]nt[_+ ]5\.2','win2003',
 'windows[_+ ]xp','winxp','windows[_+ ]nt[_+ ]5\.1','winxp', 'syndirella', 'winxp',
 'windows[_+ ]me','winme','win[_+ ]9x','winme',
 'windows[_+ ]?2000','win2000','windows[_+ ]nt[_+ ]5','win2000',
 'winnt','winnt','windows[_+ \-]?nt','winnt','win32','winnt',
+'windows[_+ ]phone','winphone',
 'win(.*)98','win98',
 'win(.*)95','win95',
 'win(.*)16','win16','windows[_+ ]3','win16',
@@ -142,7 +162,20 @@
 'microsoft','winunknown',
 'msie[_+ ]','winunknown',
 'ms[_+ ]frontpage','winunknown',
+# iOS family
+#'iphone[_+ ]os','ios_iphone',       #Must be Before Mac OS Family
+#'ipad[_+ ]os','ios_ipad',       #Must be Before Mac OS Family
+#'ipod[_+ ]os','ios_ipod',       #Must be Before Mac OS Family
+'iphone','ios_iphone', #Must be Before Mac OS Family
+'ipad','ios_ipad', #Must be Before Mac OS Family
+'ipod','ios_ipod',  #Must be Before Mac OS Family
 # Macintosh OS family
+'mac[_+ ]os[_+ ]x[_+ ]10[_\.]9','macosx9',
+'mac[_+ ]os[_+ ]x[_+ ]10[_\.]8','macosx8',
+'mac[_+ ]os[_+ ]x[_+ ]10[_\.]7','macosx7',
+'mac[_+ ]os[_+ ]x[_+ ]10[_\.]6','macosx6',
+'mac[_+ ]os[_+ ]x[_+ ]10[_\.]5','macosx5',
+'mac[_+ ]os[_+ ]x[_+ ]10[_\.]4','macosx4',
 'mac[_+ ]os[_+ ]x','macosx', 'vienna', 'macosx', 'newsfire', 'macosx', 'applesyndication', 'macosx',
 'mac[_+ ]?p','macintosh','mac[_+ ]68','macintosh','macweb','macintosh','macintosh','macintosh',
 # Linux family (linuxyyy)
@@ -200,7 +233,6 @@
 'cp/m','cp/m',
 'crayos','crayos',
 'dreamcast','dreamcast',
-'iphone[_+ ]os','ios',
 'risc[_+ ]?os','riscos',
 'symbian','symbian',
 'webtv','webtv',
@@ -215,9 +247,12 @@
 #-----------------------------------------------------------
 %OSHashLib      = (
 # Windows family OS
-'win7','<a href="http://www.microsoft.com/windows/" title="Windows 7 home page [new window]" target="_blank">Windows 7</a>',
+'win8.1','<a href="http://www.microsoft.com/windows8/" title="Windows 8.1 home page [new window]" target="_blank">Windows 8.1</a>',
+'win8','<a href="http://www.microsoft.com/windows8/" title="Windows 8 home page [new window]" target="_blank">Windows 8</a>',
+'win7','<a href="http://windows.microsoft.com/en-US/windows7/products/home/" title="Windows 7 home page [new window]" target="_blank">Windows 7</a>',
 'winlong','<a href="http://www.microsoft.com/windows/" title="Windows Vista home page [new window]" target="_blank">Windows Vista (LongHorn)</a>',
 'win2008','<a href="http://www.microsoft.com/windowsserver2008/" title="Windows 2008 home page [new window]" target="_blank">Windows 2008</a>',
+'win2012','<a href="http://www.microsoft.com/en-us/server-cloud/windows-server/2012-default.aspx/" title="Windows Server 2012 home page [new window]" target="_blank">Windows Server 2012</a>',
 'winvista','<a href="http://www.microsoft.com/windowsvista/" title="Windows Vista home page [new window]" target="_blank">Windows Vista</a>',
 'win2003','<a href="http://www.microsoft.com/windowsserver2003/" title="Windows 2003 home page [new window]" target="_blank">Windows 2003</a>',
 'winxp','<a href="http://www.microsoft.com/windowsxp/" title="Windows XP home page [new window]" target="_blank">Windows XP</a>',
@@ -228,10 +263,17 @@
 'win95','<a href="http://support.microsoft.com/ph/7864" title="Windows 95 support page [new window]" target="_blank">Windows 95</a>',
 'win16','<a href="http://www.microsoft.com/windows/WinHistoryDesktop.mspx#E1B" title="Windows 3.xx history page [new window]" target="_blank">Windows 3.xx</a>',
 'wince','<a href="http://www.microsoft.com/windowsmobile/" title="Windows Mobile home page [new window]" target="_blank">Windows Mobile</a>',
+'winphone','<a href="http://www.microsoft.com/windowsphone/" title="Windows Phone home page [new window]" target="_blank">Windows Phone</a>',
 'winunknown','Windows (unknown version)',
 'winxbox','<a href="http://www.xbox.com/" title="Microsoft XBOX home page [new window]" target="_blank">Microsoft XBOX</a>',
 # Macintosh OS
-'macosx','<a href="http://www.apple.com/macosx/" title="Mac OS X home page [new window]" target="_blank">Mac OS X</a>',
+'macosx9','<a href="http://www.apple.com/macosx/" title="Mac OS X home page [new window]" target="_blank">Mac OS X 10.9</a>',
+'macosx8','<a href="http://www.apple.com/macosx/" title="Mac OS X home page [new window]" target="_blank">Mac OS X 10.8 Mountain Lion</a>',
+'macosx7','<a href="http://www.apple.com/macosx/" title="Mac OS X home page [new window]" target="_blank">Mac OS X 10.7 Lion</a>',
+'macosx6','<a href="http://www.apple.com/macosx/" title="Mac OS X home page [new window]" target="_blank">Mac OS X 10.6 Snow Leopard</a>',
+'macosx5','<a href="http://www.apple.com/macosx/" title="Mac OS X home page [new window]" target="_blank">Mac OS X 10.5 Leopard</a>',
+'macosx4','<a href="http://www.apple.com/macosx/" title="Mac OS X home page [new window]" target="_blank">Mac OS X 10.4 Tiger</a>',
+'macosx','<a href="http://www.apple.com/macosx/" title="Mac OS X home page [new window]" target="_blank">Mac OS X others</a>',
 'macintosh','<a href="http://www.apple.com/" title="Mac OS home page [new window]" target="_blank">Mac OS</a>',
 # Linux
 'linuxandroid','<a href="http://code.google.com/android/" title="Google Android home page [new window]" target="_blank">Google Android</a>',
@@ -253,7 +295,7 @@
 'linux','<a href="http://www.distrowatch.com/" title="Linux DistroWatch home page. Useful if you find the associated user agent string in your logs. [new window]" target="_blank">Linux (Unknown/unspecified)</a>',
 'linux','GNU Linux (Unknown or unspecified distribution)',
 # Hurd
-'gnu','<a href="www.gnu.org/software/hurd/hurd.html" title="GNU Hurd home page [new window]" target="_blank">GNU Hurd</a>',
+'gnu','<a href="http://www.gnu.org/software/hurd/hurd.html" title="GNU Hurd home page [new window]" target="_blank">GNU Hurd</a>',
 # BSDs
 'bsdi','<a href="http://en.wikipedia.org/wiki/BSDi" title="BSDi home page [new window]" target="_blank">BSDi</a>',
 'bsdkfreebsd','<a href="http://www.debian.org/ports/kfreebsd-gnu/" title="Debian GNU/kFreeBSD" target="_blank">GNU/kFreeBSD</a>',
@@ -271,6 +313,10 @@
 'osf','<a href="http://www.tru64.org/" title="OSF Unix home page [new window]" target="_blank">OSF Unix</a>',
 'hp\-ux','<a href="http://www.hp.com/products1/unix/operating/" title="HP UX home page [new window]" target="_blank">HP UX</a>',
 'unix','Unknown Unix system',
+# iOS
+'ios_iphone','<a href="http://www.apple.com/iphone/ios" title="Apple iPhone home page [new window]" target="_blank">iOS (iPhone)</a>',
+'ios_ipad','<a href="http://www.apple.com/ipad/ios" title="Apple iPad home page [new window]" target="_blank">iOS (iPad)</a>',
+'ios_ipod','<a href="http://www.apple.com/ipod/ios" title="Apple iPod home page [new window]" target="_blank">iOS (iPod)</a>',
 # Other famous OS
 'beos','<a href="http://www.beincorporated.com/" title="BeOS home page [new window]" target="_blank">BeOS</a>',
 'os/2','<a href="http://www.ibm.com/software/os/warp/" title="OS/2 home page [new window]" target="_blank">OS/2</a>',
@@ -289,7 +335,6 @@
 'cp/m','<a href="http://www.digitalresearch.biz/CPM.HTM" title="CP/M home page [new window]" target="_blank">CP/M</a>',
 'crayos','<a href="http://www.cray.com/" title="CrayOS home page [new window]" target="_blank">CrayOS</a>',
 'dreamcast','<a href="http://www.sega.com/" title="Dreamcast home page [new window]" target="_blank">Dreamcast</a>',
-'ios','<a href="http://www.apple.com/" title="Apple home page [new window]" target="_blank">iOS (iPhone/iPod/iPad/...)</a>',
 'riscos','<a href="http://www.riscos.com/" title="RISC OS home page [new window]" target="_blank">RISC OS</a>',
 'symbian','<a href="http://www.symbian.com/" title="Symbian OS home page [new window]" target="_blank">Symbian OS</a>',
 'webtv','<a href="http://www.webtv.com/" title="WebTV home page [new window]" target="_blank">WebTV</a>',
@@ -309,4 +354,4 @@
 #  OEM Service Release 2.5    4.03.1214* (4.00.950C)       8/24/96-11/18/97
 #  Windows 98 retail, OEM     4.10.1998                    5/11/98
 #  Windows 98 Second Edition  4.10.2222A                   4/23/99
-#  Windows Me                 4.90.3000 
+#  Windows Me                 4.90.3000

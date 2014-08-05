@@ -19,7 +19,7 @@ use strict;no strict "refs";
 # Defines
 #-------------------------------------------------------
 use vars qw/ $REVISION $VERSION /;
-$REVISION='$Revision: 1.34 $'; $REVISION =~ /\s(.*)\s/; $REVISION=$1;
+$REVISION = '20140126';
 $VERSION="1.2 (build $REVISION)";
 
 use vars qw/
@@ -572,7 +572,7 @@ while (<>) {
 	#
 	# Matched MDaemon log file record
 	#
-	elsif (/^\"(\d\d\d\d)-(\d\d)-(\d\d) (\d\d:\d\d:\d\d)\",\"[^\"]*\",(\w+),\d+,\"([^\"]*)\",\"([^\"]*)\",\"([^\"]*)\",\"[^\"]*\",\"([^\"]*)\",\"([^\"]*)\",\"([^\"]*)\",([\.\d]+),(\d+),(\d+)/) {
+    elsif (/^\"(\d\d\d\d)-(\d\d)-(\d\d) (\d\d:\d\d:\d\d)\",\"[^\"]*\",(\w+),\d+,\"([^\"]*)\",\"([^\"]*)\",\"([^\"]*)\",\"[^\"]*\",\"([^\"]*)\",\"([^\"]*)\",\"([^\"]*)\",(-?[\.\d]+),(\d+),(\d+)/) {
 		# Example: "2003-11-06 00:00:42","2003-11-06 00:00:45",SMTPI,9443,"dillon_fm@aaaaa.net","cpeltier@domain.com","","","10.0.0.16","","",0,4563,1
 		$MailType||='mdaemon';
 		my ($id)=($numrecord);

@@ -1,6 +1,69 @@
 AWStats Changelog
 -----------------
-$Revision: 1.288 $ - $Author: eldy $ - $Date: 2010/08/18 10:49:50 $
+
+
+***** 7.3 *****
+
+New features:
+- Add command line option -version
+- Better error management of geoip modules.
+- Update domains, robots and search engines database:
+- #877 Windows 8 + iOS Support in AWStats
+- Detection of 8.1 and IE11.
+
+Fixes:
+- When using builddate option of script awstats_buildstaticpages,
+  static link is wrong.
+- Restore detection of Opera browsers versions.
+- #838 GeoIP Cities page doesnt work.
+- Add missing icons.
+- #881 Avoid warning mixed http/https with module graphgooglechartapi.
+- #918 $MinHit{'Host'} rather than $MinHit{'Login'} used in sub HTMLShowLogins.
+ 
+Other:
+- Move version system to sourceforge Git instead of CVS.
+
+
+***** 7.2 *****
+
+New features:
+- Upgrade licence to GPL v3+.
+- Update documentation.
+- Support modCloudFlareIIS.
+
+Fixes:
+- Since updating Webmin to 1.53, the Add New Config File screen layout is
+  totally messed up and unusable.
+- Update broken links to maxmind.
+
+
+***** 7.1.1 *****
+
+New features:
+- Add windows 8 detection
+- Add support of %time5 for iso date times.
+- Fix problems with Perl 5.14
+
+
+***** 7.1 *****
+
+New features/improvements:
+- Update translations.
+- Update browsers list.
+- Add example of nginx setup.
+- Add some patches from debian package.
+- Rename domain name into documentation to awstats.org
+- Can allow urls with awredir without using md5 key parameter.
+- Usage of databasebreak option possible with awstats_buildstaticpages.
+- Add rel=nofollow on links.
+- Add option AddLinkToExternalCGIWrapper to add link to a wrapper script
+  into each title of Dolibarr reports. This can be used to add a wrapper
+  to download data into a CSV file for example.
+
+Fixes:
+- Security fix into awredir.pl
+- Fix: Case of uk in googlechart api.
+- Fix: Compatibility with recent perl version.
 
 
 ***** 7.0 *****
