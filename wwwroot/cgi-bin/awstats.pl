@@ -13598,7 +13598,6 @@ sub HTMLMainDaily{
 	print "<td align=\"center\">\n";
 	print "<center>\n";
 	
->>>>>>> .merge-right.r2421
 	my $average_v = my $average_p = 0;
 	my $average_h = my $average_k = 0;
 	my $total_u = my $total_v = my $total_p = my $total_h = my $total_k = 0;
